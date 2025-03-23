@@ -1,1 +1,1 @@
-# mc833
+Repositório da disciplina Laboratório de Redes
