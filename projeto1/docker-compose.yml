@@ -1,0 +1,35 @@
+version: '3.8' # versão do docker compose
+
+services: # definição de serviços (conteineres)
+  server: # nome do serviço (pode ser usado como hostname)
+    build:
+      context: ./server # diretório que contém o Dockerfile do servidor
+    container_name: server # nome fixo do conteiner
+    networks:
+      custom_network:
+        ipv4_address: 172.25.0.10 # define IP estático para o conteiner
+    ports:
+      - "8080:8080" # mapeia porta 8080 do host para a porta 8080 do conteiner
+    volumes:
+      - ./server:/app # espelha pasta local para dentro do conteiner
+    working_dir: /app # define diretório padrão, para rodar comandos como RUN, CMD ...
+
+  client:
+    build:
+      context: ./client
+    container_name: client
+    networks:
+      custom_network:
+        ipv4_address: 172.25.0.11
+    depends_on:
+      - server # garante que o conteiner client seja criado após server
+    volumes:
+      - ./client:/app
+    working_dir: /app
+
+networks: # define rede customizada
+  custom_network:
+    driver: bridge # modo bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/24 # define sub-rede
