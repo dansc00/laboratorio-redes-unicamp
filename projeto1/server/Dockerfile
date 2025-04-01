@@ -7,12 +7,10 @@ WORKDIR /app
 # Copia todo o conteúdo da pasta local para o container
 COPY . .
 
-# Compila o servidor
-RUN gcc server.c -o server
+RUN gcc server.c -Wall -g -o server
 
 # Define o comando que será executado ao iniciar o container
 
 # Mantém o container executando para testes
 CMD ["tail", "-f", "/dev/null"] 
-
-#CMD ["./server"]
+#CMD ["./start_server.sh"]

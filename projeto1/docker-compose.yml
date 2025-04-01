@@ -1,5 +1,3 @@
-version: '3.8' # versão do docker compose
-
 services: # definição de serviços (conteineres)
   server: # nome do serviço (pode ser usado como hostname)
     build:
