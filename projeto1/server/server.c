@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <netinet/in.h>
+#include <sys/socket.h> // funções de socket
+#include <unistd.h> // read(), write(), close() ...
+#include <netinet/in.h> // sockaddr_in, htons(), INADDR_ANY ...
 #include <string.h>
-#include <arpa/inet.h>
+#include <arpa/inet.h> // conversões de IP como inet_pton()
 #include <errno.h>
+
+#include "database.h" // banco de dados
 
 #define SERVER_PORT 8080 // porta de escuta do servidor
 #define BACKLOG 5 // número de conexões que podem aguardar na fila de espera
@@ -65,7 +67,7 @@ ssize_t read_line(int file_descriptor, void *ptr_buffer, size_t max_len) {
             
             // falha real
             perror("Falha de escrita");
-            exit(EXIT_FAILURE);             
+            return -1;             
         }
     }
 
@@ -89,12 +91,12 @@ ssize_t write_all(int file_descriptor, void *ptr_buffer, size_t n){
                 n_written = 0; // reinicia
             else{
                 perror("Falha de leitura"); // falha real
-                exit(EXIT_FAILURE);
+                return 0;
             } 
         }
         n_left -= n_written;
         ptr += n_written;
-    }// falha real
+    }
     return n;
 }
 
@@ -123,6 +125,11 @@ void server_echo(int sock)
             exit(EXIT_FAILURE);
         }
     }
+}
+
+int getID(const char *title, const char *genre, const char *director){
+    // método da divisão para gerar funções de hashing de strings
+    return (((title[0]%1783)*256 + genre[0]%1783)*256 + director[0]%1783)*256;
 }
 
 int main(int argc, char **argv){
@@ -157,12 +164,21 @@ int main(int argc, char **argv){
         client_len = sizeof(client_addr); // tamanho da struct de endereço do cliente
         new_sock = accept(sock, (struct sockaddr*)&client_addr, &client_len); // gera socket com nova conexão, preenche endereço com IP e porta do cliente
         
-        child_pid = fork(); // realiza fork do servidor
-        if(child_pid == 0){ // processo filho
-            close(sock); // fecha socket do servidor pai no filho
-            server_echo(new_sock);
-            exit(EXIT_SUCCESS);
+        if(new_sock >= 0){
+            child_pid = fork(); // realiza fork do servidor
+            if(child_pid == 0){ // processo filho
+                close(sock); // fecha socket do servidor pai no filho
+                //server_echo(new_sock);
+                exit(EXIT_SUCCESS);
+            }
+            close(new_sock);  // fecha socket do filho, no filho e no pai
         }
-        close(new_sock);  // fecha socket do filho, no filho e no pai
+        else{
+            if(errno == EINTR) // falha por interrupção, reinicia
+                continue;
+            
+            perror("Falha ao receber conexão\n");
+            exit(EXIT_FAILURE);
+        }
     }
 }

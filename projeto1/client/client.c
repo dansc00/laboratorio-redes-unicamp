@@ -7,9 +7,12 @@
 #include <string.h>
 #include <arpa/inet.h> // conversões de IP como inet_pton()
 #include <errno.h>
+#include <pthread.h> // threads
 
 #define SERVER_PORT 8080 // porta de escuta do servidor
 #define MAX_PAYLOAD 1024 // tamanho máximo do payload
+#define MAX_CLIENTS 20 // número máximo de clientes (threads)
+#define MAX_OPS 7 // número máximo de operações 
 
 /*
 estruturas, tipos e constantes definidas em <netinet/in.h>
@@ -32,6 +35,17 @@ struct sockaddr_in{
     struct in_addr sin_addr; endereço ip
 }
 */
+
+// estrutura de cliente passada para função de thread
+typedef struct Client{
+
+    int id; // id de cliente
+    int op; // operação a ser realizada no servidor
+    int sock; 
+    struct sockaddr *server_addr; 
+    socklen_t server_len;
+
+} client;
 
 // lê um caractere por vez do socket até encontrar \n ou EOF, retorna número de bytes lidos, 0 se EOF ou -1 se houver erro
 ssize_t read_line(int file_descriptor, void *ptr_buffer, size_t max_len) {
@@ -64,7 +78,7 @@ ssize_t read_line(int file_descriptor, void *ptr_buffer, size_t max_len) {
             
             // falha real
             perror("Falha de escrita");
-            return EXIT_FAILURE;             
+            return -1;             
         }
     }
 
@@ -88,12 +102,12 @@ ssize_t write_all(int file_descriptor, void *ptr_buffer, size_t n){
                 n_written = 0; // reinicia
             else{
                 perror("Falha de leitura"); // falha real
-                return EXIT_FAILURE;
+                return 0;
             } 
         }
         n_left -= n_written;
         ptr += n_written;
-    }// falha real
+    }
     return n;
 }
 
@@ -116,6 +130,65 @@ void client_echo(FILE *fp, int sock){
     }
 }
 
+// inicializa cliente
+client* initialize_client(int id, int sock, struct sockaddr* server_addr, socklen_t server_len){
+
+    client *new_client = malloc(sizeof(client));
+    new_client->id = id;
+    new_client->op = 1 + rand() % MAX_OPS;
+    new_client->sock = sock;
+    new_client->server_addr = server_addr;
+    new_client->server_len = server_len;
+
+    return new_client;
+}
+
+// conecta thread ao servidor
+void* connect_thread(void *thread){
+
+    client *c = (client*)thread;
+    
+    if(connect(c->sock, c->server_addr, c->server_len) >= 0){
+        switch(c->op){
+
+            char *request[MAX_PAYLOAD];
+
+            case 1: // cadastrar filme
+                
+            break;
+
+            case 2: // alterar gênero
+
+            break;
+
+            case 3: // 
+            break;
+
+            case 4:
+            break;
+
+            case 5:
+            break;
+
+            case 6:
+            break;
+
+            case 7:
+            break;
+        };
+        exit(EXIT_SUCCESS);
+    }
+    else{
+        perror("Erro ao tentar conexão com servidor");
+        free(c);
+        exit(EXIT_FAILURE);
+    }
+}
+
+void print_log(int sock, int i, int op){
+    printf("Cliente %d conectado via socket %d solicita operação %d no banco\n", i, sock);
+}
+
 int main(int argc, char **argv){
 
     int sock;
@@ -126,9 +199,7 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
-    // cria socket TCP, usando IPv4 e protocolo padrão
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-
+    // CONFIGURAÇÃO DE SERVIDOR
     // zera bloco de memória, evita bugs ao utilizar bind(), connect() 
     memset(&server_addr, 0, sizeof(server_addr));
 
@@ -138,8 +209,24 @@ int main(int argc, char **argv){
     server_addr.sin_port = htons(SERVER_PORT);
     // converte IP passado de string para formato binário e armazena no campo correto da struct
     inet_pton(AF_INET, argv[1], &server_addr.sin_addr);
+    
+    // CONFIGURAÇÃO DE THREADS CLIENTE
+    srand(time(NULL)); // seed para gerador de pseudo-aleatórios, garante sequência diferente a cada execução
+    int num_clients = 1 + rand() % MAX_CLIENTS; // gera número aleatório de cliente (mínimo de 1)
+    pthread_t *clients = malloc(num_clients * sizeof(pthread_t)); // armazena clientes como IDs de thread
 
-    connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)); // estabele conexão com o servidor
-    client_echo(stdin, sock);
-    exit(EXIT_SUCCESS);
+    for(int i = 0; i < num_clients; i++){
+        sock = socket(AF_INET, SOCK_STREAM, 0); // cria socket TCP, usando IPv4 e protocolo padrão
+        client *new_client = initialize_client(i, sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
+        pthread_create(&clients[i], NULL, connect_thread, (void*)new_client);
+        print_log(sock, i, new_client->op);
+    }
+
+    for(int i = 0; i < num_clients; i++){
+        pthread_join(clients[i], NULL);
+    }
+
+    free(clients);
+    //client_echo(stdin, sock);
+    return 0;
 }
