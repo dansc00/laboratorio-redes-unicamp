@@ -281,6 +281,7 @@ void* thread_handler(void* sthread){
     pthread_mutex_unlock(&mutex);
 
     close(s->sock);
+    free(s);
     pthread_exit(NULL);
 }
 
@@ -339,8 +340,6 @@ int main(int argc, char **argv){
                 free(sthread);
                 continue;
             }
-
-            free(sthread);
 
             // thread destacada, não precisa dar join (evita vazamento)
             pthread_detach(tid);
