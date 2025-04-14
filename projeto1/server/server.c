@@ -7,12 +7,15 @@
 #include <string.h>
 #include <arpa/inet.h> // conversões de IP como inet_pton()
 #include <errno.h>
+#include <pthread.h> // threads
 
 #include "database.h" // banco de dados
 
 #define SERVER_PORT 8080 // porta de escuta do servidor
 #define BACKLOG 5 // número de conexões que podem aguardar na fila de espera
 #define MAX_PAYLOAD 1024 // tamanho máximo do payload
+
+pthread_mutex_t mutex;
 
 /*
 estruturas, tipos e constantes definidas em <netinet/in.h>
@@ -36,7 +39,59 @@ struct sockaddr_in{
 }
 */
 
-// lê um caractere por vez do socket até encontrar \n ou EOF, retorna número de bytes lidos, 0 se EOF ou -1 se houver erro
+// lista ligada de threads de servidor
+typedef struct ServerThread{
+
+    int sock;
+    sqlite3 *db;
+
+} server_thread;
+
+// lê um caractere por vez do buffer até encontrar \0, retorna número de bytes lidos, 0 se EOF ou -1 se houver erro
+ssize_t read_all(int file_descriptor, void *ptr_buffer, size_t max_len) {
+
+    ssize_t n; // número total de bytes lidos
+    ssize_t rc; // retorno de cada chamada ao read()
+    char c; // caractere lido
+    char *ptr; // ponteiro de escrita no buffer
+    char *head; // ponteiro que guarda o início do buffer
+
+    ptr = ptr_buffer;
+    head = ptr_buffer; // salva o início do buffer
+
+    // read() -> lê n bytes via socket e armazena em c, retorna número de bytes lidos, 0 se EOF ou < 0 se houve erro
+    for(n = 0; n < max_len; n++) {
+        rc = read(file_descriptor, &c, 1);
+
+        if (rc == 1) {
+            *ptr = c;
+            ptr++;
+
+        } else if (rc == 0) {
+            // EOF
+            break;
+
+        } else {
+            if (errno == EINTR) {
+                continue; // tenta de novo se for interrupção
+            }
+            perror("Erro de leitura\n");
+            return -1;
+        }
+    }
+
+    // adiciona \0 no final se houver espaço
+    if (n < max_len) {
+        *ptr = '\0';
+    }
+
+    // volta ponteiro ptr ao início, se você quiser reutilizar:
+    ptr = head;
+
+    return n;
+}
+
+// lê um caractere por vez do buffer até encontrar \n ou EOF, retorna número de bytes lidos, 0 se EOF ou -1 se houver erro
 ssize_t read_line(int file_descriptor, void *ptr_buffer, size_t max_len) {
 
     ssize_t n; // número total de bytes lidos
@@ -45,8 +100,10 @@ ssize_t read_line(int file_descriptor, void *ptr_buffer, size_t max_len) {
     char *ptr; // caminha no buffer
 
     ptr = ptr_buffer;
+
     for(n = 1; n < max_len; n++) {
 
+        // read() -> lê n bytes via socket e armazena em c, retorna número de bytes lidos, 0 se EOF ou < 0 se houve erro
         if((rc = read(file_descriptor, &c, 1)) == 1) { // byte lido
             *ptr= c; // adiciona caractere
             ptr++; // passa para a próxima posição
@@ -56,8 +113,10 @@ ssize_t read_line(int file_descriptor, void *ptr_buffer, size_t max_len) {
         } 
         else if(rc == 0) {
 
-            if(n == 1)
+            if(n == 1){ // primeira iteração
+                printf("0 bytes lidos\n");
                 return 0;  // EOF, nada lido
+            }
             else
                 break;     // EOF, retornando dados lidos
         } 
@@ -66,7 +125,7 @@ ssize_t read_line(int file_descriptor, void *ptr_buffer, size_t max_len) {
                 continue;  // tenta novamente
             
             // falha real
-            perror("Falha de escrita");
+            perror("Falha de escrita\n");
             return -1;             
         }
     }
@@ -84,13 +143,15 @@ ssize_t write_all(int file_descriptor, void *ptr_buffer, size_t n){
 
     while(n_left > 0){
         // função de escrita, retorna quantidade de bytes escritos (pode n enviar todos de uma vez), 0 (raro) ou -1 caso ocorra um erro
+        // write() -> envia conteúdo do buffer por socket, retorna número de bytes escritos
         n_written = write(file_descriptor, ptr, n_left);
+
         if(n_written <= 0){
 
             if(n_written < 0 && errno == EINTR) // sinal de interrupção de função
                 n_written = 0; // reinicia
             else{
-                perror("Falha de leitura"); // falha real
+                perror("Falha de leitura\n"); // falha real
                 return 0;
             } 
         }
@@ -99,49 +160,150 @@ ssize_t write_all(int file_descriptor, void *ptr_buffer, size_t n){
     }
     return n;
 }
+/*
+// inicializa lista de threads
+server_thread* initialize_threads(){
 
-// processa mensagem recebida e escreve echo
-void server_echo(int sock)
-{
-    ssize_t n; // bytes lidos em dados recebidos, ssize_t é usado para contagem de bytes ou indicação de erro
-    char rcv_buffer[MAX_PAYLOAD]; // buffer armazena dados recebidos
-
-    while(1){
-
-        n = read_line(sock, rcv_buffer, MAX_PAYLOAD); 
-        if(n > 0)
-            write_all(sock, rcv_buffer, n);
-
-        else if(n == 0){
-            printf("Conexão encerrada pelo cliente\n");
-            break;
-        }
-
-        else{
-            if(errno == EINTR)
-                continue; // repete caso erro por interrupção
-            
-            perror("Erro de leitura");
-            exit(EXIT_FAILURE);
-        }
-    }
+    return NULL;
 }
 
-int getID(const char *title, const char *genre, const char *director){
-    // método da divisão para gerar funções de hashing de strings
+// adiciona thread de servidor
+server_thread* add_thread(server_thread *thread, int sock, int num_threads, sqlite3 *db){
+
+    server_thread *new = malloc(sizeof(server_thread));
+    new->sock = sock;
+    new->tid = num_threads;
+    new->db = db;
+    new->next = thread;
+
+    return new;
+}
+
+// libera lista de threads
+void free_threads(server_thread *threads){
+
+    server_thread *aux1 = threads;
+    server_thread *aux2;
+
+    while(aux1 != NULL){
+        aux2 = aux1;
+        aux1 = aux1->next;
+        free(aux2);
+    }
+}
+*/
+// gera ID utilizando o método de divisão para gerar funções de hashing de string. Garante mínima probabilidade de repetição de ID
+int get_id(const char *title, const char *genre, const char *director){
+
     return (((title[0]%1783)*256 + genre[0]%1783)*256 + director[0]%1783)*256;
 }
 
+// processa mensagem recebida
+int receive_request(int sock, sqlite3 *db){
+
+    ssize_t n; // ssize_t é usado para contagem de bytes ou indicação de erro
+    char *title, *genre, *director, *year;
+    char response[MAX_PAYLOAD];
+    char rcv_buffer[MAX_PAYLOAD];
+    char *opt; // opção de entrada
+    char delimiter[2] = "|"; // delimitador das entradas
+
+    n = read_line(sock, rcv_buffer, MAX_PAYLOAD);
+    if(n > 0){
+        opt = strtok(rcv_buffer, delimiter); // tokeniza entrada em strings separadas por delimitador
+
+        switch(opt[0]){
+
+            case '1': // cadastrar filme, 5 argumentos
+                title = strtok(NULL, delimiter);
+                genre = strtok(NULL, delimiter);
+                director = strtok(NULL, delimiter);
+                year = strtok(NULL, delimiter);
+
+                int id = get_id(title, genre, director);
+
+                if(add_movie(db, id, title, genre, director, year) == 1){
+                    snprintf(response, sizeof(response), "Filme de ID %d inserido com sucesso\n", id);
+                }
+                else{
+                    snprintf(response, sizeof(response), "Erro ao inserir filme\n", "");
+                }
+
+                n = write_all(sock, response, strlen(response));
+                if(n > 0)
+                    return 1;
+                else{
+                    return 0;
+                }
+            break;
+
+            case '2':
+            break;
+
+            case '3':
+            break;
+
+            case '4':
+            break;
+
+            case '5':
+            break;
+
+            case '6':
+            break;
+
+            case '7':
+            break;
+
+            default:
+                perror("Opção de entrada inválida\n");
+                return 0;
+        }
+    }
+    else if(n == 0){
+        printf("Conexão encerrada pelo cliente\n");
+        return 0;
+    }
+
+    else{
+        perror("Erro de leitura");
+        return 0;
+    }
+}
+
+// função de threads de servidor
+void* thread_handler(void* sthread){
+
+    server_thread *s = (server_thread*)sthread;
+
+    pthread_mutex_lock(&mutex);
+    receive_request(s->sock, s->db);
+    pthread_mutex_unlock(&mutex);
+
+    close(s->sock);
+    pthread_exit(NULL);
+}
+
 int main(int argc, char **argv){
+
+    // INICIALIZAÇÃO DO BANCO DE DADOS
+    sqlite3 *db;
+    if(!initialize_database(&db)){
+        perror("Falha ao inicializar o banco de dados");
+        exit(EXIT_FAILURE);
+    }
+
+    pthread_mutex_init(&mutex, NULL);
+
     // descritor de arquivo: inteiro que referencia um recurso aberto para o kernel
-    int sock, new_sock; // descritores de arquivo para processo pai e filho
-    pid_t child_pid; // pid do processo filho
+    int sock, new_sock; // descritores de socket para processo pai e filho
 
     // socklen_t: inteiro de pelo menos 32 bits, utilizado para manter um padrão de tamanho, independente da arquitetura do sistema. Garante portabilidade e atendimento do padrão posix
     socklen_t client_len; // armazena tamanho em bytes de estruturas de endereço socket
 
     struct sockaddr_in client_addr, server_addr; // estrutura que armazena parâmetros para criação de socket
 
+    //CONFIGURAÇÃO DE SOCKET
     // cria socket TCP, usando IPv4 e protocolo padrão
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if(sock == -1){
@@ -163,15 +325,25 @@ int main(int argc, char **argv){
     while(1){
         client_len = sizeof(client_addr); // tamanho da struct de endereço do cliente
         new_sock = accept(sock, (struct sockaddr*)&client_addr, &client_len); // gera socket com nova conexão, preenche endereço com IP e porta do cliente
-        
+
         if(new_sock >= 0){
-            child_pid = fork(); // realiza fork do servidor
-            if(child_pid == 0){ // processo filho
-                close(sock); // fecha socket do servidor pai no filho
-                //server_echo(new_sock);
-                exit(EXIT_SUCCESS);
+        
+            pthread_t tid; // id de thread
+            server_thread *sthread = malloc(sizeof(server_thread));
+            sthread->sock = new_sock;
+            sthread->db = db;
+
+            if(pthread_create(&tid, NULL, thread_handler, (void*)sthread) != 0){
+                perror("Erro ao criar thread");
+                close(new_sock);
+                free(sthread);
+                continue;
             }
-            close(new_sock);  // fecha socket do filho, no filho e no pai
+
+            free(sthread);
+
+            // thread destacada, não precisa dar join (evita vazamento)
+            pthread_detach(tid);
         }
         else{
             if(errno == EINTR) // falha por interrupção, reinicia
@@ -181,4 +353,9 @@ int main(int argc, char **argv){
             exit(EXIT_FAILURE);
         }
     }
+
+    close_database(db);
+    pthread_mutex_destroy(&mutex);
+
+    return 0;
 }
