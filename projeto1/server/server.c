@@ -192,17 +192,29 @@ void free_threads(server_thread *threads){
     }
 }
 */
-// gera ID utilizando o método de divisão para gerar funções de hashing de string. Garante mínima probabilidade de repetição de ID
-int get_id(const char *title, const char *genre, const char *director){
 
-    return (((title[0]%1783)*256 + genre[0]%1783)*256 + director[0]%1783)*256;
+// método da divisão para strings usado como função de hashing. Gera chave com pouca probabilidade de repetição
+int get_id(char *title, char *genre, char *director, char *year){
+
+    char combined[MAX_PAYLOAD];
+    int m = 1783; // número primo longe de uma potência de dois
+    int result = 0;
+
+    snprintf(combined, sizeof(combined), "%s%s%s%s", title, genre, director, year);
+    
+    for(int i = 0; i < strlen(combined); i++){
+        result += ((combined[i] % m) * 256);
+    }
+
+    return result;
 }
 
 // processa mensagem recebida
 int receive_request(int sock, sqlite3 *db){
 
     ssize_t n; // ssize_t é usado para contagem de bytes ou indicação de erro
-    char *title, *genre, *director, *year;
+    char *id, *title, *genre, *director, *year;
+    int int_id = 0;
     char response[MAX_PAYLOAD];
     char rcv_buffer[MAX_PAYLOAD];
     char *opt; // opção de entrada
@@ -210,49 +222,146 @@ int receive_request(int sock, sqlite3 *db){
 
     n = read_line(sock, rcv_buffer, MAX_PAYLOAD);
     if(n > 0){
+        
         opt = strtok(rcv_buffer, delimiter); // tokeniza entrada em strings separadas por delimitador
 
         switch(opt[0]){
 
-            case '1': // cadastrar filme, 5 argumentos
+            case '1': // cadastrar filme
                 title = strtok(NULL, delimiter);
                 genre = strtok(NULL, delimiter);
                 director = strtok(NULL, delimiter);
-                year = strtok(NULL, delimiter);
+                year = strtok(NULL, delimiter); 
 
-                int id = get_id(title, genre, director);
+                int_id = get_id(title, genre, director, year);
 
-                if(add_movie(db, id, title, genre, director, year) == 1){
-                    snprintf(response, sizeof(response), "Filme de ID %d inserido com sucesso\n", id);
+                if(id_list(db, int_id, response, sizeof(response)) == 0){ // registro não existe no banco
+
+                    if(add_movie(db, int_id, title, genre, director, year) == 1)
+                        snprintf(response, sizeof(response), "Filme inserido com sucesso\n\n");
+                    
+                    else
+                        snprintf(response, sizeof(response), "Erro ao inserir filme\n\n");
                 }
                 else{
-                    snprintf(response, sizeof(response), "Erro ao inserir filme\n", "");
+                    snprintf(response, sizeof(response), "Filme já existe no banco de dados\n\n");
                 }
 
                 n = write_all(sock, response, strlen(response));
                 if(n > 0)
                     return 1;
-                else{
+                else
                     return 0;
+            break;
+
+            case '2': // atualizar gênero de filme
+                id = strtok(NULL, delimiter);
+                genre = strtok(NULL, delimiter);
+
+                sscanf(id, "%d", &int_id); 
+
+                if(id_list(db, int_id, response, sizeof(response)) != 0){ // registro existe no banco
+
+                    if(genre_update(db, int_id, genre) == 1)
+                        snprintf(response, sizeof(response), "Gênero alterado com sucesso\n\n");
+                    
+                    else
+                        snprintf(response, sizeof(response), "Erro ao alterar gênero de filme\n\n");
+                    
                 }
+                else{
+                    snprintf(response, sizeof(response), "Filme não existe no banco de dados\n\n");
+                }
+
+                n = write_all(sock, response, strlen(response));
+                if(n > 0)
+                    return 1;
+                else
+                    return 0;
             break;
 
-            case '2':
+            case '3': // remove filme
+                id = strtok(NULL, delimiter);
+
+                sscanf(id, "%d", &int_id);
+
+                if(id_list(db, int_id, response, sizeof(response)) != 0){ // registro existe no banco
+
+                    if(delete_movie(db, int_id) == 1)
+                        snprintf(response, sizeof(response), "Filme deletado com sucesso\n\n");
+                    
+                    else
+                        snprintf(response, sizeof(response), "Erro ao deletar filme\n\n");
+                    
+                }
+                else{
+                    snprintf(response, sizeof(response), "Filme não existe no banco de dados\n\n");
+                }
+
+                n = write_all(sock, response, strlen(response));
+                if(n > 0)
+                    return 1;
+                else
+                    return 0;
             break;
 
-            case '3':
+            case '4': // listar informação básica de filmes
+
+                if(basic_list(db, response, sizeof(response)) == 0)
+                    snprintf(response, sizeof(response), "Erro ao listar filmes\n\n");
+                
+                n = write_all(sock, response, strlen(response));
+                if(n > 0)
+                    return 1;
+                else
+                    return 0;
             break;
 
-            case '4':
+            case '5': // listar todas informações de filmes
+                if(all_list(db, response, sizeof(response)) == 0)
+                    snprintf(response, sizeof(response), "Erro ao listar filmes\n\n");
+                
+                
+                n = write_all(sock, response, strlen(response));
+                if(n > 0)
+                    return 1;
+                else
+                    return 0;
+            break;
+            
+            case '6': // lista filme por id
+                id = strtok(NULL, delimiter);
+
+                sscanf(id, "%d", &int_id);
+
+                if(id_list(db, int_id, response, sizeof(response)) != 0){ // registro existe no banco
+
+                    if(id_list(db, int_id, response, sizeof(response)) == 0)
+                        snprintf(response, sizeof(response), "Erro ao listar filme por ID\n\n");
+                    
+                }
+                else{
+                    snprintf(response, sizeof(response), "Filme não existe no banco de dados\n\n");
+                }
+
+                n = write_all(sock, response, strlen(response));
+                if(n > 0)
+                    return 1;
+                else
+                    return 0;
             break;
 
-            case '5':
-            break;
+            case '7': // lista filmes por gênero
+                genre = strtok(NULL, delimiter);
 
-            case '6':
-            break;
-
-            case '7':
+                if(genre_list(db, genre, response, sizeof(response)) == 0)
+                    snprintf(response, sizeof(response), "Erro ao listar filmes por gênero\n\n");
+            
+                n = write_all(sock, response, strlen(response));
+                if(n > 0)
+                    return 1;
+                else
+                    return 0;
             break;
 
             default:
@@ -267,8 +376,9 @@ int receive_request(int sock, sqlite3 *db){
 
     else{
         perror("Erro de leitura");
-        return 0;
     }
+
+    return 0;
 }
 
 // função de threads de servidor

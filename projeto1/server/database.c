@@ -39,6 +39,29 @@ void close_database(sqlite3 *db){
     sqlite3_close(db);
 }
 
+// verifica se o banco está vazio
+int is_database_empty(sqlite3 *db) {
+    const char *sql = "SELECT COUNT(*) FROM filmes;";
+    sqlite3_stmt *stmt;
+    int count = -1;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        fprintf(stderr, "Erro ao preparar COUNT: %s\n", sqlite3_errmsg(db));
+        return 1; // por segurança, assume vazio em caso de erro
+    }
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        count = sqlite3_column_int(stmt, 0);
+    } else {
+        fprintf(stderr, "Erro ao executar COUNT: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        return 1;
+    }
+
+    sqlite3_finalize(stmt);
+    return count == 0 ? 1 : 0;
+}
+
 // adiciona filme
 int add_movie(sqlite3 *db, int id, const char *title, const char *genre, const char *director, const char *year){
 
@@ -66,7 +89,7 @@ int add_movie(sqlite3 *db, int id, const char *title, const char *genre, const c
     return 1;
 }
 
-// altera gênero de filme
+// altera gênero de filme por id
 int genre_update(sqlite3 *db, int id, const char *new_genre){
 
     const char *sql = "UPDATE filmes SET genero = ? WHERE id = ?;";
@@ -123,12 +146,11 @@ int delete_movie(sqlite3 *db, int id){
     }
 
     sqlite3_finalize(stmt);
-    printf("Filme com ID %d removido com sucesso.\n", id);
     return 1;
 }
 
 // lista todos ids e títulos
-int basic_list(sqlite3 *db){
+int basic_list(sqlite3 *db, char *response, size_t size){
 
     const char *sql = "SELECT id, titulo FROM filmes;";
     sqlite3_stmt *stmt;
@@ -138,20 +160,24 @@ int basic_list(sqlite3 *db){
         return 0;
     }
 
+    int offset = 0; // marca offset de buffer
+
+    offset += snprintf(response + offset, size - offset, "Lista de IDs e títulos de filmes cadastrados\n");
     // itera sobre os resultados
     while(sqlite3_step(stmt) == SQLITE_ROW){
         int id = sqlite3_column_int(stmt, 0);
         const unsigned char *title = sqlite3_column_text(stmt, 1);
 
-        printf("ID: %d\tTítulo: %s\n", id, title);
+        offset += snprintf(response + offset, size - offset, "ID: %d | Título: %s\n", id, title);
     }
 
+    snprintf(response + offset, size - offset, "\n");
     sqlite3_finalize(stmt);
     return 1; 
 }
 
 // lista todas informações
-int all_list(sqlite3 *db){
+int all_list(sqlite3 *db, char *response, size_t size){
 
     const char *sql = "SELECT id, titulo, genero, diretor, ano FROM filmes;";
     sqlite3_stmt *stmt;
@@ -161,6 +187,9 @@ int all_list(sqlite3 *db){
         return 0;
     }
 
+    int offset = 0; // marca offset de buffer
+
+    offset += snprintf(response + offset, size - offset, "Lista de filmes cadastrados\n");
     // executa a consulta linha por linha
     while(sqlite3_step(stmt) == SQLITE_ROW){
         int id = sqlite3_column_int(stmt, 0);
@@ -169,16 +198,16 @@ int all_list(sqlite3 *db){
         const unsigned char *director = sqlite3_column_text(stmt, 3);
         const unsigned char *year     = sqlite3_column_text(stmt, 4);
 
-        printf("ID: %d | Título: %s | Gênero: %s | Diretor: %s | Ano: %s\n",
-               id, title, genre, director, year);
+        offset += snprintf(response + offset, size - offset, "ID: %d | Título: %s | Gênero: %s | Diretor: %s | Ano: %s\n", id, title, genre, director, year);
     }
 
+    snprintf(response + offset, size - offset, "\n");
     sqlite3_finalize(stmt);
     return 1;
 }
 
 // lista informações de filme por id
-int id_list(sqlite3 *db, int id){
+int id_list(sqlite3 *db, int id, char *response, size_t size){
 
     const char *sql = "SELECT id, titulo, genero, diretor, ano FROM filmes WHERE id = ?;";
     sqlite3_stmt *stmt;
@@ -199,8 +228,7 @@ int id_list(sqlite3 *db, int id){
         const unsigned char *director = sqlite3_column_text(stmt, 3);
         const unsigned char *year     = sqlite3_column_text(stmt, 4);
 
-        printf("ID: %d | Título: %s | Gênero: %s | Diretor: %s | Ano: %s\n",
-               id_result, title, genre, director, year);
+        snprintf(response, size, "Resultado da busca por ID %d\nID: %d | Título: %s | Gênero: %s | Diretor: %s | Ano: %s\n\n", id_result, id_result, title, genre, director, year);
 
         sqlite3_finalize(stmt);
         return 1;
@@ -213,7 +241,7 @@ int id_list(sqlite3 *db, int id){
 }
 
 // lista filmes por gênero
-int genre_list(sqlite3 *db, const char *genre_search){
+int genre_list(sqlite3 *db, const char *genre_search, char *response, size_t size){
 
     const char *sql = "SELECT id, titulo, genero, diretor, ano FROM filmes WHERE genero = ?;";
     sqlite3_stmt *stmt;
@@ -227,7 +255,9 @@ int genre_list(sqlite3 *db, const char *genre_search){
     sqlite3_bind_text(stmt, 1, genre_search, -1, SQLITE_STATIC);
 
     int result = 0;
+    int offset = 0; // marca offset de buffer
 
+    offset += snprintf(response + offset, size - offset, "Lista de filmes por gênero %s\n", genre_search);
     // itera sobre os resultados
     while(sqlite3_step(stmt) == SQLITE_ROW){
         result = 1;
@@ -238,14 +268,15 @@ int genre_list(sqlite3 *db, const char *genre_search){
         const unsigned char *director = sqlite3_column_text(stmt, 3);
         const unsigned char *year     = sqlite3_column_text(stmt, 4);
 
-        printf("ID: %d | Título: %s | Gênero: %s | Diretor: %s | Ano: %s\n",
-               id, title, genre, director, year);
+        offset += snprintf(response + offset, size - offset, "ID: %d | Título: %s | Gênero: %s | Diretor: %s | Ano: %s\n", id, title, genre, director, year);
     }
 
     if(!result){
         printf("Nenhum filme do gênero \"%s\" foi encontrado.\n", genre_search);
+        return 0;
     }
 
+    snprintf(response + offset, size - offset, "\n");
     sqlite3_finalize(stmt);
     return 1;
 }

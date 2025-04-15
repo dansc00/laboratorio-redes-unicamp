@@ -7,6 +7,7 @@
 #include <string.h>
 #include <arpa/inet.h> // conversões de IP como inet_pton()
 #include <errno.h>
+#include <ctype.h> // touper()
 #include <pthread.h> // threads
 
 #define SERVER_PORT 8080 // porta de escuta do servidor
@@ -36,30 +37,13 @@ struct sockaddr_in{
 }
 */
 
-// estrutura que armazena informações de filme para teste
-typedef struct Movie{
-
-    char *title;
-    char *genre;
-    char *director;
-    char *year;
-
-} movie;
-
-// estrutura que armazena vetor de filmes
-typedef struct Movies{
-
-    movie **movies;
-    int curr_movies; // número atual de filmes no vetor
-
-} movies;
-
 // estrutura de cliente passada para função de thread
 typedef struct Client{
 
     int id; // id de cliente
     int op; // operação a ser realizada no servidor
-    struct Movie *movie; // filme passado como argumento na operação
+
+    // argumentos de conexão
     int sock; 
     struct sockaddr *server_addr; 
     socklen_t server_len;
@@ -135,47 +119,31 @@ ssize_t write_all(int file_descriptor, void *ptr_buffer, size_t n){
     return n;
 }
 
+// log para teste
+void print_log(int sock, int i, int op){
+
+    printf("Cliente %d conectado via socket %d solicita operação %d no banco\n", i, sock, op);
+}
+
+// converte string em maiúscula
+void capitalize_string(char *str){
+
+    for(int i = 0; i < strlen(str); i++){
+        str[i] = toupper(str[i]);
+    }
+}
+
 // inicializa cliente
-client* initialize_client(int id, movie* movie, int sock, struct sockaddr* server_addr, socklen_t server_len){
+client* initialize_client(int id, int sock, struct sockaddr* server_addr, socklen_t server_len){
 
     client *new = malloc(sizeof(client));
+    new->op = 1 + rand() % MAX_OPS; // número aleatório entre 1 e 7
     new->id = id;
-    new->op = 1; //1 + rand() % MAX_OPS; // número aleatório entre 1 e 7
-    new->movie = movie;
     new->sock = sock;
     new->server_addr = server_addr;
     new->server_len = server_len;
 
     return new;
-}
-
-// inicializa lista de filmes
-movies* initialize_movies(){
-
-    movies *new = malloc(sizeof(movies));
-    new->movies = malloc(MAX_CLIENTS * sizeof(movie*));
-    new->curr_movies = 0;
-
-    return new;
-}
-
-// inicializa filme
-movie* initialize_movie(char *title, char *genre, char *director, char *year){
-
-    movie *new = malloc(sizeof(movie));
-    new->title = title;
-    new->genre = genre;
-    new->director = director;
-    new->year = year;
-
-    return new;
-}
-
-// adiciona filme
-void add_movie(movie *movie, movies *movies_list){
-
-    movies_list->movies[movies_list->curr_movies] = movie;
-    movies_list->curr_movies++;
 }
 
 // conecta thread ao servidor
@@ -188,20 +156,27 @@ void* connect_thread(void *thread){
     
     if(connect(c->sock, c->server_addr, c->server_len) >= 0){
 
-        
+        print_log(c->sock, c->id, c->op);
         switch(c->op){
 
             case 1: // cadastrar filme
 
-                // requisição formatada em buffer: operacao titulo genero diretor ano
-                snprintf(request, sizeof(request), "%d|%s|%s|%s|%s\n", c->op, c->movie->title, c->movie->genre, c->movie->director, c->movie->year);
-                
-                n = write_all(c->sock, request, strlen(request));
-                if(n > 0){
-                    n = read_line(c->sock, response, MAX_PAYLOAD);
+                if(fgets(request, sizeof(request), stdin) != NULL){
+                    
+                    capitalize_string(request);
 
+                    n = write_all(c->sock, request, strlen(request));
                     if(n > 0){
-                        fputs(response, stdout);                
+                        n = read_line(c->sock, response, MAX_PAYLOAD);
+
+                        if(n > 0){
+                            fputs(response, stdout);                
+                        }
+                        else{
+                            close(c->sock);
+                            free(c);
+                            return NULL;
+                        }
                     }
                     else{
                         close(c->sock);
@@ -210,6 +185,7 @@ void* connect_thread(void *thread){
                     }
                 }
                 else{
+                    perror("Erro ao ler entrada\n");
                     close(c->sock);
                     free(c);
                     return NULL;
@@ -217,22 +193,201 @@ void* connect_thread(void *thread){
             break;
 
             case 2: // alterar gênero
+                
+                if(fgets(request, sizeof(request), stdin) != NULL){
+                        
+                    capitalize_string(request);
+                    
+                    n = write_all(c->sock, request, strlen(request));
+                    if(n > 0){
+                        n = read_line(c->sock, response, MAX_PAYLOAD);
 
+                        if(n > 0){
+                            fputs(response, stdout);                
+                        }
+                        else{
+                            close(c->sock);
+                            free(c);
+                            return NULL;
+                        }
+                    }
+                    else{
+                        close(c->sock);
+                        free(c);
+                        return NULL;
+                    }
+                }
+                else{
+                    perror("Erro ao ler entrada\n");
+                    close(c->sock);
+                    free(c);
+                    return NULL;
+                }
             break;
 
             case 3: // remover filme
+
+                if(fgets(request, sizeof(request), stdin) != NULL){
+                            
+                    capitalize_string(request);
+                    
+                    n = write_all(c->sock, request, strlen(request));
+                    if(n > 0){
+                        n = read_line(c->sock, response, MAX_PAYLOAD);
+
+                        if(n > 0){
+                            fputs(response, stdout);                
+                        }
+                        else{
+                            close(c->sock);
+                            free(c);
+                            return NULL;
+                        }
+                    }
+                    else{
+                        close(c->sock);
+                        free(c);
+                        return NULL;
+                    }
+                }
+                else{
+                    perror("Erro ao ler entrada\n");
+                    close(c->sock);
+                    free(c);
+                    return NULL;
+                }
             break;
 
             case 4: // listar titulos por ids
+
+                if(fgets(request, sizeof(request), stdin) != NULL){
+                            
+                    capitalize_string(request);
+                    
+                    n = write_all(c->sock, request, strlen(request));
+                    if(n > 0){
+                        n = read_line(c->sock, response, MAX_PAYLOAD);
+
+                        if(n > 0){
+                            fputs(response, stdout);                
+                        }
+                        else{
+                            close(c->sock);
+                            free(c);
+                            return NULL;
+                        }
+                    }
+                    else{
+                        close(c->sock);
+                        free(c);
+                        return NULL;
+                    }
+                }
+                else{
+                    perror("Erro ao ler entrada\n");
+                    close(c->sock);
+                    free(c);
+                    return NULL;
+                }
             break;
 
             case 5: // listar todos filmes
+
+                if(fgets(request, sizeof(request), stdin) != NULL){
+                            
+                    capitalize_string(request);
+                    
+                    n = write_all(c->sock, request, strlen(request));
+                    if(n > 0){
+                        n = read_line(c->sock, response, MAX_PAYLOAD);
+
+                        if(n > 0){
+                            fputs(response, stdout);                
+                        }
+                        else{
+                            close(c->sock);
+                            free(c);
+                            return NULL;
+                        }
+                    }
+                    else{
+                        close(c->sock);
+                        free(c);
+                        return NULL;
+                    }
+                }
+                else{
+                    perror("Erro ao ler entrada\n");
+                    close(c->sock);
+                    free(c);
+                    return NULL;
+                }
             break;
 
             case 6: // listar informações de um filme
+
+                if(fgets(request, sizeof(request), stdin) != NULL){
+                            
+                    capitalize_string(request);
+                    
+                    n = write_all(c->sock, request, strlen(request));
+                    if(n > 0){
+                        n = read_line(c->sock, response, MAX_PAYLOAD);
+
+                        if(n > 0){
+                            fputs(response, stdout);                
+                        }
+                        else{
+                            close(c->sock);
+                            free(c);
+                            return NULL;
+                        }
+                    }
+                    else{
+                        close(c->sock);
+                        free(c);
+                        return NULL;
+                    }
+                }
+                else{
+                    perror("Erro ao ler entrada\n");
+                    close(c->sock);
+                    free(c);
+                    return NULL;
+                }
             break;
 
             case 7: // listar filmes por gênero
+
+                if(fgets(request, sizeof(request), stdin) != NULL){
+                        
+                    capitalize_string(request);
+                    
+                    n = write_all(c->sock, request, strlen(request));
+                    if(n > 0){
+                        n = read_line(c->sock, response, MAX_PAYLOAD);
+
+                        if(n > 0){
+                            fputs(response, stdout);                
+                        }
+                        else{
+                            close(c->sock);
+                            free(c);
+                            return NULL;
+                        }
+                    }
+                    else{
+                        close(c->sock);
+                        free(c);
+                        return NULL;
+                    }
+                }
+                else{
+                    perror("Erro ao ler entrada\n");
+                    close(c->sock);
+                    free(c);
+                    return NULL;
+                }
             break;
         };
     }
@@ -246,12 +401,6 @@ void* connect_thread(void *thread){
     close(c->sock);
     free(c);
     return NULL;
-}
-
-// log para teste
-void print_log(int sock, int i, int op){
-
-    printf("Cliente %d conectado via socket %d solicita operação %d no banco\n", i, sock, op);
 }
 
 int main(int argc, char **argv){
@@ -275,42 +424,33 @@ int main(int argc, char **argv){
     // converte IP passado de string para formato binário e armazena no campo correto da struct
     inet_pton(AF_INET, argv[1], &server_addr.sin_addr);
 
-    // CONFIGURAÇÃO DE FILMES PARA TESTE
-    movies *movies = initialize_movies();
-    
-    movie *movie1 = initialize_movie("Kill Bill vol 1", "Ação", "Quentin Tarantino", "2003");
-    movie *movie2 = initialize_movie("Kill Bill vol 2", "Ação", "Quentin Tarantino", "2004");
-    movie *movie3 = initialize_movie("Pulp Fiction", "Crime", "Quentin Tarantino", "1994");
-    movie *movie4 = initialize_movie("Interestelar", "Ficção Científica", "Christopher Nolan", "2014");
-    movie *movie5 = initialize_movie("2001: Uma Odisséia no Espaço", "Ficção Científica", "Stanley Kubrick", "1968");
-
-    add_movie(movie1, movies);
-    add_movie(movie2, movies);
-    add_movie(movie3, movies);
-    add_movie(movie4, movies);
-    add_movie(movie5, movies);
+    // MENU
+    printf("BANCO DE FILMES\n");
+    printf("\n");
+    printf("Entre com opção e argumentos dessa forma:\n");
+    printf("Inserir filme - 1|titulo|genero|diretor|ano\n");
+    printf("Atualizar gênero de filme por ID - 2|ID|genero\n");
+    printf("Remover filme - 3|ID\n");
+    printf("Listar títulos e IDs de todos filmes - 4\n");
+    printf("Listar todas informações de todos filmes - 5\n");
+    printf("Listar todas informações de filme por ID - 6|ID\n");
+    printf("Listar todas informações de filme por gênero - 7|genero\n");
+    printf("\n");
 
     // CONFIGURAÇÃO DE THREADS CLIENTE
     pthread_t *clients = malloc(MAX_CLIENTS * sizeof(pthread_t)); // armazena clientes como IDs de thread
-
-    int i = 0; // iterador
+    int i;
     srand(time(NULL));  // Define a semente baseada na hora atual para gerador de pseudo-aleatorios, evita a execução com sempre a mesma sequência
     for(i = 0; i < MAX_CLIENTS; i++){
         sock = socket(AF_INET, SOCK_STREAM, 0); // cria socket TCP, usando IPv4 e protocolo padrão
-        client *new_client = initialize_client(i, movies->movies[i], sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
+        client *new_client = initialize_client(i, sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
         pthread_create(&clients[i], NULL, connect_thread, (void*)new_client);
-        print_log(sock, i, new_client->op);
     }
 
     for(i = 0; i < MAX_CLIENTS; i++){
         pthread_join(clients[i], NULL);
     }
 
-    for(i = 0; i < MAX_CLIENTS; i++){
-        free(movies->movies[i]);
-    }
-
-    free(movies->movies);
     free(clients);
 
     return 0;
