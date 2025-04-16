@@ -7,7 +7,7 @@
 int initialize_database(sqlite3 **db){
 
     // tenta abrir ou criar o banco
-    if(sqlite3_open("filmes.db", db) != SQLITE_OK){
+    if(sqlite3_open("movies.db", db) != SQLITE_OK){
         fprintf(stderr, "Erro ao abrir banco de dados: %s\n", sqlite3_errmsg(*db));
         return 0;
     }

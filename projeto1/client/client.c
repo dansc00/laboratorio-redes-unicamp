@@ -50,6 +50,50 @@ typedef struct Client{
 
 } client;
 
+// lê um caractere por vez do buffer até encontrar \0, retorna número de bytes lidos, 0 se EOF ou -1 se houver erro
+ssize_t read_all(int file_descriptor, void *ptr_buffer, size_t max_len) {
+
+    ssize_t n; // número total de bytes lidos
+    ssize_t rc; // retorno de cada chamada ao read()
+    char c; // caractere lido
+    char *ptr; // ponteiro de escrita no buffer
+    char *head; // ponteiro que guarda o início do buffer
+
+    ptr = ptr_buffer;
+    head = ptr_buffer; // salva o início do buffer
+
+    // read() -> lê n bytes via socket e armazena em c, retorna número de bytes lidos, 0 se EOF ou < 0 se houve erro
+    for(n = 0; n < max_len; n++) {
+        rc = read(file_descriptor, &c, 1);
+
+        if (rc == 1) {
+            *ptr = c;
+            ptr++;
+
+        } else if (rc == 0) {
+            // EOF
+            break;
+
+        } else {
+            if (errno == EINTR) {
+                continue; // tenta de novo se for interrupção
+            }
+            perror("Erro de leitura\n");
+            return -1;
+        }
+    }
+
+    // adiciona \0 no final se houver espaço
+    if (n < max_len) {
+        *ptr = '\0';
+    }
+
+    // volta ponteiro ptr ao início, se você quiser reutilizar:
+    ptr = head;
+
+    return n;
+}
+
 // lê um caractere por vez do buffer até encontrar \n ou EOF, retorna número de bytes lidos, 0 se EOF ou -1 se houver erro
 ssize_t read_line(int file_descriptor, void *ptr_buffer, size_t max_len) {
 
@@ -157,239 +201,31 @@ void* connect_thread(void *thread){
     if(connect(c->sock, c->server_addr, c->server_len) >= 0){
 
         print_log(c->sock, c->id, c->op);
-        switch(c->op){
+        
+        if(fgets(request, sizeof(request), stdin) != NULL){
+            
+            capitalize_string(request);
 
-            case 1: // cadastrar filme
+            n = write_all(c->sock, request, strlen(request));
+            if(n > 0){
+                n = read_line(c->sock, response, MAX_PAYLOAD);
 
-                if(fgets(request, sizeof(request), stdin) != NULL){
-                    
-                    capitalize_string(request);
-
-                    n = write_all(c->sock, request, strlen(request));
-                    if(n > 0){
-                        n = read_line(c->sock, response, MAX_PAYLOAD);
-
-                        if(n > 0){
-                            fputs(response, stdout);                
-                        }
-                        else{
-                            close(c->sock);
-                            free(c);
-                            return NULL;
-                        }
-                    }
-                    else{
-                        close(c->sock);
-                        free(c);
-                        return NULL;
-                    }
+                if(n > 0){
+                    fputs(response, stdout);                
                 }
                 else{
-                    perror("Erro ao ler entrada\n");
                     close(c->sock);
                     free(c);
                     return NULL;
                 }
-            break;
-
-            case 2: // alterar gênero
-                
-                if(fgets(request, sizeof(request), stdin) != NULL){
-                        
-                    capitalize_string(request);
-                    
-                    n = write_all(c->sock, request, strlen(request));
-                    if(n > 0){
-                        n = read_line(c->sock, response, MAX_PAYLOAD);
-
-                        if(n > 0){
-                            fputs(response, stdout);                
-                        }
-                        else{
-                            close(c->sock);
-                            free(c);
-                            return NULL;
-                        }
-                    }
-                    else{
-                        close(c->sock);
-                        free(c);
-                        return NULL;
-                    }
-                }
-                else{
-                    perror("Erro ao ler entrada\n");
-                    close(c->sock);
-                    free(c);
-                    return NULL;
-                }
-            break;
-
-            case 3: // remover filme
-
-                if(fgets(request, sizeof(request), stdin) != NULL){
-                            
-                    capitalize_string(request);
-                    
-                    n = write_all(c->sock, request, strlen(request));
-                    if(n > 0){
-                        n = read_line(c->sock, response, MAX_PAYLOAD);
-
-                        if(n > 0){
-                            fputs(response, stdout);                
-                        }
-                        else{
-                            close(c->sock);
-                            free(c);
-                            return NULL;
-                        }
-                    }
-                    else{
-                        close(c->sock);
-                        free(c);
-                        return NULL;
-                    }
-                }
-                else{
-                    perror("Erro ao ler entrada\n");
-                    close(c->sock);
-                    free(c);
-                    return NULL;
-                }
-            break;
-
-            case 4: // listar titulos por ids
-
-                if(fgets(request, sizeof(request), stdin) != NULL){
-                            
-                    capitalize_string(request);
-                    
-                    n = write_all(c->sock, request, strlen(request));
-                    if(n > 0){
-                        n = read_line(c->sock, response, MAX_PAYLOAD);
-
-                        if(n > 0){
-                            fputs(response, stdout);                
-                        }
-                        else{
-                            close(c->sock);
-                            free(c);
-                            return NULL;
-                        }
-                    }
-                    else{
-                        close(c->sock);
-                        free(c);
-                        return NULL;
-                    }
-                }
-                else{
-                    perror("Erro ao ler entrada\n");
-                    close(c->sock);
-                    free(c);
-                    return NULL;
-                }
-            break;
-
-            case 5: // listar todos filmes
-
-                if(fgets(request, sizeof(request), stdin) != NULL){
-                            
-                    capitalize_string(request);
-                    
-                    n = write_all(c->sock, request, strlen(request));
-                    if(n > 0){
-                        n = read_line(c->sock, response, MAX_PAYLOAD);
-
-                        if(n > 0){
-                            fputs(response, stdout);                
-                        }
-                        else{
-                            close(c->sock);
-                            free(c);
-                            return NULL;
-                        }
-                    }
-                    else{
-                        close(c->sock);
-                        free(c);
-                        return NULL;
-                    }
-                }
-                else{
-                    perror("Erro ao ler entrada\n");
-                    close(c->sock);
-                    free(c);
-                    return NULL;
-                }
-            break;
-
-            case 6: // listar informações de um filme
-
-                if(fgets(request, sizeof(request), stdin) != NULL){
-                            
-                    capitalize_string(request);
-                    
-                    n = write_all(c->sock, request, strlen(request));
-                    if(n > 0){
-                        n = read_line(c->sock, response, MAX_PAYLOAD);
-
-                        if(n > 0){
-                            fputs(response, stdout);                
-                        }
-                        else{
-                            close(c->sock);
-                            free(c);
-                            return NULL;
-                        }
-                    }
-                    else{
-                        close(c->sock);
-                        free(c);
-                        return NULL;
-                    }
-                }
-                else{
-                    perror("Erro ao ler entrada\n");
-                    close(c->sock);
-                    free(c);
-                    return NULL;
-                }
-            break;
-
-            case 7: // listar filmes por gênero
-
-                if(fgets(request, sizeof(request), stdin) != NULL){
-                        
-                    capitalize_string(request);
-                    
-                    n = write_all(c->sock, request, strlen(request));
-                    if(n > 0){
-                        n = read_line(c->sock, response, MAX_PAYLOAD);
-
-                        if(n > 0){
-                            fputs(response, stdout);                
-                        }
-                        else{
-                            close(c->sock);
-                            free(c);
-                            return NULL;
-                        }
-                    }
-                    else{
-                        close(c->sock);
-                        free(c);
-                        return NULL;
-                    }
-                }
-                else{
-                    perror("Erro ao ler entrada\n");
-                    close(c->sock);
-                    free(c);
-                    return NULL;
-                }
-            break;
-        };
+            }
+            else{
+                close(c->sock);
+                free(c);
+                return NULL;
+            }
+        }
+        
     }
     else{
         perror("Erro ao tentar conexão com servidor\n");

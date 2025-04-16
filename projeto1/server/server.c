@@ -160,38 +160,6 @@ ssize_t write_all(int file_descriptor, void *ptr_buffer, size_t n){
     }
     return n;
 }
-/*
-// inicializa lista de threads
-server_thread* initialize_threads(){
-
-    return NULL;
-}
-
-// adiciona thread de servidor
-server_thread* add_thread(server_thread *thread, int sock, int num_threads, sqlite3 *db){
-
-    server_thread *new = malloc(sizeof(server_thread));
-    new->sock = sock;
-    new->tid = num_threads;
-    new->db = db;
-    new->next = thread;
-
-    return new;
-}
-
-// libera lista de threads
-void free_threads(server_thread *threads){
-
-    server_thread *aux1 = threads;
-    server_thread *aux2;
-
-    while(aux1 != NULL){
-        aux2 = aux1;
-        aux1 = aux1->next;
-        free(aux2);
-    }
-}
-*/
 
 // método da divisão para strings usado como função de hashing. Gera chave com pouca probabilidade de repetição
 int get_id(char *title, char *genre, char *director, char *year){

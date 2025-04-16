@@ -7,8 +7,8 @@ WORKDIR /app
 # Copia todo o conteúdo da pasta local para o container
 COPY . .
 
-RUN gcc client.c -Wall -g -o client
+RUN gcc client.c -o client
 
 # Define o comando que será executado ao iniciar o container
-#CMD ["tail", "-f", "/dev/null"] 
-CMD ["./start_client.sh"]
+CMD ["tail", "-f", "/dev/null"] 
+#CMD ["./client 172.25.0.10"]
