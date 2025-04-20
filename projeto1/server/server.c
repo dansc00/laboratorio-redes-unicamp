@@ -39,7 +39,7 @@ struct sockaddr_in{
 }
 */
 
-// lista ligada de threads de servidor
+// lista de threads de servidor
 typedef struct ServerThread{
 
     int sock;
