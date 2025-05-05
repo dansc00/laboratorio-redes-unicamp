@@ -4,7 +4,7 @@ import numpy as np
 # manipulador de captura de pacotes .pcap
 class CaptureHandler:
 
-    def __init__(self, PATH):
+    def __init__(self, PATH=""):
         self.cpt = rdpcap(PATH)
 
     # mensagens de falha
@@ -99,20 +99,27 @@ class CaptureHandler:
 
         return np.array(rttList) 
     
-# main
 if __name__ == "__main__":
+
+    # imprime métricas obtidas na análise da captura
+    def printOutput(cpt):
+
+        print(f"Total de pacotes capturados: {cpt.getTotalPacks()}")
+        print(f"IP origem das requisições: {cpt.getSrcIp(cpt.cpt[0])}")
+        print(f"IP destino das requisições: {cpt.getDstIp(cpt.cpt[0])}")
+        print(f"RTT médio: {cpt.getAverageRtt(cpt.getIcmpRttList())*1000:.2f} ms")
+        print(f"Desvio padrão de RTTs: {cpt.getRttStdDeviation(cpt.getIcmpRttList())*1000:.2f} ms")
+        print(f"RTT máximo: {cpt.getMaxRtt(cpt.getIcmpRttList())*1000:.2f} ms")
+        print(f"RTT mínimo: {cpt.getMinRtt(cpt.getIcmpRttList())*1000:.2f} ms")
+        print(f"Throughput: {cpt.getThroughput()/1000000:.4f} Mbps")
+        print()
 
     PATH1 = "capture/h1-h3.pcap"
     PATH2 = "capture/h2-h4.pcap"
-    cpt1 = CaptureHandler(PATH1)
-    cpt2 = CaptureHandler(PATH2)
+    capture1 = CaptureHandler(PATH1)
+    capture2 = CaptureHandler(PATH2)
 
-    print("Captura 1: h1 ping -c 200 h3: interface h1")
-    print(f"Total de pacotes capturados: {cpt1.getTotalPacks()}")
-    print(f"IP origem das requisições: {cpt1.getSrcIp(cpt1.cpt[0])}")
-    print(f"IP destino das requisições: {cpt1.getDstIp(cpt1.cpt[0])}")
-    print(f"RTT médio: {cpt1.getAverageRtt(cpt1.getIcmpRttList())*1000:.2f} ms")
-    print(f"Desvio padrão de RTTs: {cpt1.getRttStdDeviation(cpt1.getIcmpRttList())*1000:.2f} ms")
-    print(f"RTT máximo: {cpt1.getMaxRtt(cpt1.getIcmpRttList())*1000:.2f} ms")
-    print(f"RTT mínimo: {cpt1.getMinRtt(cpt1.getIcmpRttList())*1000:.2f} ms")
-    print(f"Throughput: {cpt1.getThroughput()/1000000:.4f} Mbps")
+    printOutput(capture1)
+    printOutput(capture2)
+
+    
