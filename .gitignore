@@ -3,3 +3,4 @@
 *.out
 /projeto1/client/client
 /projeto1/server/server
+__pycache__/
