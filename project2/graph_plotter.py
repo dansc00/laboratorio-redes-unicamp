@@ -215,7 +215,8 @@ class GraphPlotter:
             print(f"Error saving graph: {e}")
 
     # plot using object attributes or method arguments 
-    def plotLineGraph(self, x, y, color=None, plotLabel=None, xLabel=None, yLabel=None, title=None, grid=None, marker='o', linestyle='-', autoScaleY=False, scaleFactor=3):
+    def plotLineGraph(self, x, y, color=None, plotLabel=None, xLabel=None, yLabel=None, title=None, grid=None, marker='o', linestyle='-', autoScaleY=False, 
+                      autoScaleX=False, yScaleFactor=3, xScaleFactor=3, yScaleStart=0, xScaleStart=0):
 
         color = self.getColor(color, self.plotCount)
         self.plotCount += 1
@@ -230,7 +231,11 @@ class GraphPlotter:
         # automatic scale adjustment, to better visualization of the graph
         if autoScaleY and len(y) > 0:
             yMean = sum(y) / len(y)
-            self.axis.set_ylim(0, yMean * scaleFactor)  
+            self.axis.set_ylim(yScaleStart, yMean * yScaleFactor)
+
+        if autoScaleX and len(x) > 0:
+            xMean = sum(x) / len(x)
+            self.axis.set_xlim(xScaleStart, xMean * xScaleFactor)
 
     def plotBarGraph(self, x, y, color=None, plotLabel=None, xLabel=None, yLabel=None, title=None, grid=None, align="center", edgecolor="black"):
 

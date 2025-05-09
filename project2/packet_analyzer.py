@@ -1,11 +1,20 @@
 from scapy.all import *
+from collections import Counter
 import numpy as np
+from graph_plotter import GraphPlotter
+import sys
 
 # analisador de pacotes em capturas .pcap
 class PacketAnalyzer:
 
-    def __init__(self, packets=None):
-        self.packets = packets
+    def __init__(self, id=None, path=None):
+        self.id = id
+
+        try:
+            self.packets = rdpcap(path)
+        except Exception as e:
+            print(f"Capture path is wrong or not specified: {e}")
+            sys.exit(1)
 
     # mensagens de falha
     def icmpFail(self):
@@ -16,186 +25,172 @@ class PacketAnalyzer:
         print("The packet doesn't have an IP layer")
         return None
     
-    # métodos gerais
-    # retorna pacotes
+    # retorna todos pacotes
     def getPackets(self):
         return self.packets
+    
+    # retorna pacote específico
+    def getPacket(self, pkt):
+        return self.getPackets()[pkt] if len(self.getPackets()) > 0 else 0
+    
+    # retorna tempo de captura de pacote
+    def getTime(self, pkt):
+        return float(pkt.time)
+    
+    # retorna id
+    def getId(self):
+        return self.id
     
     # retorna número total de pacotes
     def getTotalPackets(self):
         return len(self.getPackets())
     
-    # retorna total de bytes somados nos pacotes 
+    # retorna total de bytes capturados
     def getTotalBytes(self):
         return sum(len(pkt) for pkt in self.packets) if self.getTotalPackets() > 0 else 0
     
-    # retorna tempo total de captura
+    # retorna tempo total de captura em s
     def getTotalTime(self):
-
-        if self.getTotalPackets() <= 0:
-            print("The capture doesn't have any packets")
-            return 0
-
-        startTime = float(self.getPackets()[0].time)
-        endTime = float(self.getPackets()[-1].time)
-
-        return endTime - startTime
+        return self.getTimeDiff(self.getPackets()[0], self.getPackets()[-1]) if self.getTotalPackets() > 0 else 0
     
-    # recebe dois pacotes e retorna a diferença de tempo entre eles
+    # retorna pacotes capturados por segundo
+    def getCaptureRate(self):
+        return self.getTotalPackets()/self.getTotalTime() if self.getTotalTime > 0 else 0
+
+    # recebe dois pacotes e retorna a diferença de tempo de captura entre eles
     def getTimeDiff(self, pkt1, pkt2):
-        return float(pkt2.time - pkt1.time)
+        return self.getTime(pkt2) - self.getTime(pkt1)
     
-    # retorna estatísticas de jitter: lista de jitters medidos e média
-    def getJitterStats(self, intervals):
-
-        if self.getTotalPackets() < 3:
-            print("There is no way to measure jitter with less than three packets")
-            return 0
-        
-        jitters = np.diff(intervals) if len(intervals) > 0 else []
-        mean = np.mean(jitters) if len(jitters) > 0 else 0
-        std = np.std(jitters) if len(jitters) > 0 else 0
-
-        return {"jitters": jitters,
-                "mean": mean,
-                "std": std}
-
-    # retorna throughput medido em bps
-    def getThroughput(self):
-
-        totalTime = self.getTotalTime()
-        totalBytes = self.getTotalBytes()
-        totalBits = totalBytes * 8
-
-        return totalBits/totalTime if totalTime > 0 else 0
-
-    # métodos para análise IP
-    # retorna IP de origem 
-    def getSrcIp(self, pkt):
-        return pkt[IP].src if IP in pkt else self.ipFail()
-
-    # retorna IP de destino
-    def getDstIp(self, pkt):
-        return pkt[IP].dst if IP in pkt else self.ipFail()
+    def getRttStats(self):
+        pass
     
-    # métodos para análise ICMP
-    # retorna número de sequência de pacote ICMP
-    def getIcmpSeq(self, pkt):
-        return pkt[ICMP].seq if ICMP in pkt else self.icmpFail()
-    
-    # retorna tipo de ICMP: 0 = echo request , 8 = echo reply
-    def getIcmpType(self, pkt):
-        return pkt[ICMP].type if ICMP in pkt else self.icmpFail()
-
-    # retorna lista de sequência de pacotes ICMP em ordem crescente (sem duplicatas)
-    def getIcmpSeqsList(self):
-
-        seqsList = set() # conjunto sem duplicatas
-        for pkt in self.getPackets():
-            if ICMP in pkt:
-                seqsList.add(self.getIcmpSeq(pkt))
-
-        return sorted(list(seqsList)) if seqsList else []
-
-    # retorna estatísticas de RTT ICMP: lista de RTT, média, máximo, mínimo e desvio padrão
-    def getIcmpRttStats(self):
-
-        rtts = []
-        requests = {}
-
-        for pkt in self.getPackets():
-            if ICMP in pkt:
-                seq = self.getIcmpSeq(pkt)
-
-                if self.getIcmpType(pkt) == 8: # echo request
-                    requests[seq] = pkt
-
-                elif self.getIcmpType(pkt) == 0 and seq in requests: # echo reply
-                    rtts.append(self.getTimeDiff(requests[seq], pkt))
-
-        rtts = np.array(rtts) if rtts else []
-        mean = np.mean(rtts) if len(rtts) > 0 else 0 
-        max = np.max(rtts) if len(rtts) > 0 else 0
-        min = np.min(rtts) if len(rtts) > 0 else 0
-        std = np.std(rtts) if len(rtts) > 0 else 0
-
-        return {"rtts": rtts,
-                "mean": mean,
-                "max": max,
-                "min": min,
-                "std": std}
-    
-    # retorna estatísticas de intervalo de chegada entre pacotes ICMP consecutivos: lista de intervalos, média e desvio padrão
-    def getIcmpIntervalStats(self):
+    # retorna estatísticas de intervalo de chegada entre todos pacotes: lista de intervalos, média, desvio padrão, máximo e mínimo
+    def getIntervalStats(self):
 
         if self.getTotalPackets() < 2:
             print("There is no way to measure interval with less than two packets")
             return None
 
-        requestTimes = []
+        times = []
 
         for pkt in self.getPackets():
-            if ICMP in pkt:
-                if self.getIcmpType(pkt) == 8:
-                    requestTimes.append(float(pkt.time))
+            times.append(self.getTime(pkt))
 
-        intervals = np.diff(requestTimes) if requestTimes else []  # diferença entre tempos consecutivos
+        intervals = np.diff(times) if times else []  # diferença entre tempos consecutivos
         mean = np.mean(intervals) if len(intervals) > 0 else 0
         std = np.std(intervals) if len(intervals) > 0 else 0
+        max = np.max(intervals) if len(intervals) > 0 else 0
+        min = np.min(intervals) if len(intervals) > 0 else 0
 
         return {"intervals": intervals,
                 "mean": mean,
-                "std": std} 
+                "std": std,
+                "max": max,
+                "min": min
+                } 
     
-    # retorna estatísticas de perda de pacotes: enviados, recebidos, perdidos, taxa de percas
-    def getIcmpPacketLossStats(self):
+    # recebe lista de intervalos de chegada entre pacotes e retorna estatísticas de jitter: lista de jitters medidos, média, desvio padrão, máximo e mínimo
+    def getJitterStats(self, intervals):
 
-        sent = 0
-        seqReceived = set()
+        if self.getTotalPackets() < 3:
+            print("There is no way to measure jitter with less than three packets")
+            return None
+        
+        jitters = np.abs(np.diff(intervals)) if len(intervals) > 0 else []
+        mean = np.mean(jitters) if len(jitters) > 0 else 0
+        std = np.std(jitters) if len(jitters) > 0 else 0
+        max = np.max(jitters) if len(jitters) > 0 else 0
+        min = np.min(jitters) if len(jitters) > 0 else 0
+
+        return {"jitters": jitters,
+                "mean": mean,
+                "std": std,
+                "max": max,
+                "min": min
+                }
+    
+    def getPacketLossStats(self):
+        pass
+
+    # retorna throughput medido em Mbps
+    def getThroughput(self):
+
+        totalBits = self.getTotalBytes() * 8
+
+        return (totalBits/self.getTotalTime())/1000000 if self.getTotalTime() > 0 else 0
+    
+    # retorna lista de camadas e quantidade total encontrada por camada
+    def getLayers(self):
+        
+        layers = Counter() 
 
         for pkt in self.getPackets():
-            if ICMP in pkt:
-                if self.getIcmpType(pkt) == 8:
-                    sent += 1
+            while pkt:
+                layers[pkt.name] += 1 # incrementa número de camadas
+                pkt = pkt.payload # próxima camada, payload da camada atual
 
-                elif self.getIcmpType(pkt) == 0:
-                    seqReceived.add(self.getIcmpSeq(pkt))
+        nLayers = list(layers.values())
+        layers = list(layers.keys())
         
-        received = len(seqReceived)
-        lost = sent - received
-        lossRate = (lost * 100)/sent if sent > 0 else 0
-
-        return {"sent": sent, 
-                "received": received, 
-                "lost": lost, 
-                "lossRate": lossRate}
-
-    # imprime métricas ICMP
-    def printIcmpMetrics(self):
-
-        bytes = self.getTotalBytes()
-        src = self.getSrcIp(self.getPackets()[0])
-        dst = self.getDstIp(self.getPackets()[0])
-        rttStats = self.getIcmpRttStats()
-        intervalStats = self.getIcmpIntervalStats()
-        jitterStats = self.getJitterStats(intervalStats["intervals"])
-        throughput = self.getThroughput()
-        lossStats = self.getIcmpPacketLossStats()
-
-        print(f"Total bytes: {bytes} bytes")
-        print(f"IP source: {src}")
-        print(f"IP destination: {dst}")
-        print(f"Mean RTT: {rttStats["mean"]*1000:.2f} ms \
-                RTT standard deviation: {rttStats["std"]*1000:.2f} ms \
-                Maximum RTT: {rttStats["max"]*1000:.2f} ms \
-                Minimum RTT: {rttStats["min"]*1000:.2f} ms")
-        print(f"Mean packet arrival time: {intervalStats["mean"]:.2f} s")
-        print(f"Mean jitter: {jitterStats["mean"]*1000:.2f} ms \
-                Jitter standard deviation: {jitterStats["std"]*1000:.2f} ms")
-        print(f"Throughput: {throughput/1000000:.4f} Mbps")
-        print(f"{lossStats["sent"]} packages sent \
-                {lossStats["received"]} packages received \
-                {lossStats["lost"]} packages lost \
-                Loss rate = {lossStats["lossRate"]:.1f}%")
-        print()
+        return {"layers": layers,
+                "nLayers": nLayers
+                }
     
+    # salva visualização gráfica de pacote
+    def packetPdfDump(self, filename, pkt):
+        self.getPacket(pkt).pdfdump(filename, layer_shift=1)
+    
+    # imprime métricas
+    def printMetrics(self):
+
+        id = self.getId()
+        total = self.getTotalPackets()
+        totalBytes = self.getTotalBytes()
+        layers = self.getLayers()["layers"]
+        intervals = self.getIntervalStats()["intervals"]
+        meanInterval = self.getIntervalStats()["mean"]
+        stdInterval = self.getIntervalStats()["std"]
+        maxInterval = self.getIntervalStats()["max"]
+        minInterval = self.getIntervalStats()["min"]
+        meanJitter = self.getJitterStats(intervals)["mean"]
+        stdJitter = self.getJitterStats(intervals)["std"]
+        maxJitter = self.getJitterStats(intervals)["max"]
+        minJitter = self.getJitterStats(intervals)["min"]
+        throughput = self.getThroughput()
+
+        print(f"Capture {id}")
+        print(f"Total packets: {total}")
+        print(f"Total bytes: {totalBytes} bytes")
+        print(f"Layers: {layers}")
+        print(f"Mean packet arrival time: {meanInterval*1000:.2f} ms")
+        print(f"Standard deviation of packet arrival time: {stdInterval*1000:.2f} ms")
+        print(f"Maximum packet arrival time: {maxInterval*1000:.2f} ms")
+        print(f"Minimum packet arrival time: {minInterval*1000:.2f} ms")
+        print(f"Jitter mean: {meanJitter*1000:.2f} ms")
+        print(f"Jitter standard deviation: {stdJitter*1000:.2f} ms")
+        print(f"Maximum jitter: {maxJitter*1000:.2f} ms")
+        print(f"Minimum jitter: {minJitter*1000:.2f} ms")
+        print(f"Throughput: {throughput} bps")
+        print()
+
+    # plota gráficos gerais
+    def plotGraphs(self, path):
+
+        id = self.getId()
+        layers = self.getLayers()["layers"]
+        nLayers = self.getLayers()["nLayers"]
+        intervals = self.getIntervalStats()["intervals"]
+        jitters = self.getJitterStats(intervals)["jitters"]
+        nPackets = [i for i in range(1, self.getTotalPackets()+1)]
+
+        intervalGraph = GraphPlotter(xLabel="Packet capture sequence", yLabel="Time (s)")
+        intervalGraph.plotLineGraph(nPackets[1:], intervals, color="yellow", plotLabel="Interval between consecutive packets", marker=None)
+        intervalGraph.saveGraph(path+id+"-interval.png")
+
+        jitterGraph = GraphPlotter(xLabel="Packet capture sequence", yLabel="Time (s)")
+        jitterGraph.plotLineGraph(nPackets[2:], jitters, color="red", plotLabel="Variation in delay of consecutive packets (Jitter)", marker=None, autoScaleY=True, yScaleFactor=20)
+        jitterGraph.saveGraph(path+id+"-jitter.png")
+        
+        layersGraph = GraphPlotter(xLabel="Protocol layers", yLabel="Amount of packets", legendPosition="right")
+        layersGraph.plotBarGraph(layers, nLayers, plotLabel=layers)
+        layersGraph.saveGraph(path+id+"-layers.png")
