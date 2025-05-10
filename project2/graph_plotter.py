@@ -146,7 +146,7 @@ class Color(Enum):
     WHITESMOKE = "whitesmoke"
     YELLOWGREEN = "yellowgreen"
 
-# plot graphs
+# plot graphs using matplotlib
 class GraphPlotter:
 
     def __init__(self, title=None, xLabel=None, yLabel=None, grid=True, legendFlag=True, legendPosition=None, colors=[], plotCount=0):
@@ -156,7 +156,7 @@ class GraphPlotter:
         self.grid = grid # graph grid option
         self.legendFlag = legendFlag # graph legend option
         self.legendPosition = legendPosition # legend position option (right, bottom, left)
-        self.colors = colors if colors else list(Color) # list of Color enum
+        self.colors = colors if colors else list(Color) # colors input or list of Color enum
         self.plotCount = plotCount # number of plots
         self.fig, self.axis = plt.subplots() # subplots objects for each instance, avoid error using plt global 
     
@@ -263,6 +263,18 @@ class GraphPlotter:
         self.axis.pie(sizes, labels=labels, colors=colors, explode=explode, startangle=startangle, autopct=autopct, shadow=shadow)
         self.axis.set_title(self.title or "")
         self.axis.axis('equal')  # circle
+
+    def plotHistogram(self, data, bins=10, color=None, plotLabel=None, xLabel=None, yLabel=None, title=None, grid=None, edgecolor="black", density=False, histtype="bar"):
+
+        color = self.getColor(color, self.plotCount)
+        self.plotCount += 1
+
+        self.axis.hist(data, bins, color=color, label=plotLabel, edgecolor=edgecolor, density=density, histtype=histtype)
+
+        self.axis.set_xlabel(xLabel or self.xLabel)
+        self.axis.set_ylabel(yLabel or self.yLabel)
+        self.axis.set_title(title or self.title)
+        self.axis.grid(self.grid if grid is None else grid)
 
     # custom user input plot
     def plotUserInput(self):

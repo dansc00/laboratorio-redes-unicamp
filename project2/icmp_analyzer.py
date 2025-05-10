@@ -4,7 +4,7 @@ from packet_analyzer import PacketAnalyzer
 from graph_plotter import GraphPlotter
 from ip_analyzer import IpAnalyzer
 
-# analisador de pacotes em capturas .pcap
+# analisador de camada ICMP
 class IcmpAnalyzer(PacketAnalyzer):
 
     def __init__(self, id=None, path=None):
@@ -41,7 +41,7 @@ class IcmpAnalyzer(PacketAnalyzer):
         return sorted(list(seqsList)) if seqsList else []
 
     # retorna estatísticas de RTT ICMP: lista de RTT, desvio padrão, média, máximo, mínimo
-    # sobrescrito
+    # override
     def getRttStats(self):
 
         rtts = []
@@ -71,7 +71,7 @@ class IcmpAnalyzer(PacketAnalyzer):
                 }
     
     # retorna estatísticas de intervalo de chegada entre requisições ICMP: lista de intervalos, média, desvio padrão, máximo e mínimo
-    # sobrescrito
+    # override
     def getIntervalStats(self):
 
         if self.getTotalPackets() < 2:
@@ -99,7 +99,7 @@ class IcmpAnalyzer(PacketAnalyzer):
                 } 
     
     # retorna estatísticas de perda de pacotes: enviados, recebidos, perdidos, taxa de perdas
-    # sobrescrito
+    # override
     def getPacketLossStats(self):
 
         sent = 0
@@ -126,7 +126,7 @@ class IcmpAnalyzer(PacketAnalyzer):
                 }
 
     # imprime métricas ICMP
-    # sobrescrito
+    # override
     def printMetrics(self):
 
         id = self.getId()
@@ -180,48 +180,118 @@ class IcmpAnalyzer(PacketAnalyzer):
         print(f"Loss rate: {lossRate}%")
         print()
     
-    # plota gráficos ICMP
-    # sobrescrito
-    def plotGraphs(self, path):
+    # plotagem de gráficos ICMP
+    # override
+    def plotIntervalGraph(self, path):
+        
+        id = self.getId()
+        seqs = self.getIcmpSeqsList()
+        intervals = self.getIntervalStats()["intervals"]
+
+        intervalGraph = GraphPlotter(xLabel="ICMP sequence number", yLabel="Time (s)")
+        intervalGraph.plotLineGraph(seqs[1:], intervals, color="yellow", plotLabel="ICMP request packet arrival time interval", marker=None)
+        intervalGraph.saveGraph(path+id+"-interval.png")
+    
+    # override
+    def plotJitterGraph(self, path):
+
+        id = self.getId()
+        seqs = self.getIcmpSeqsList()
+        intervals = self.getIntervalStats()["intervals"]
+        jitters = self.getJitterStats(intervals)["jitters"]
+
+        jitterGraph = GraphPlotter(xLabel="ICMP sequence number", yLabel="Time (s)")
+        jitterGraph.plotLineGraph(seqs[2:], jitters, color="red", plotLabel="Variation in ICMP request packet arrival time interval (Jitter)", marker=None, autoScaleY=True)
+        jitterGraph.saveGraph(path+id+"-jitter.png")
+    
+    #override
+    def plotLayersGraph(self, path):
 
         id = self.getId()
         layers = self.getLayers()["layers"]
         nLayers = self.getLayers()["nLayers"]
-        intervals = self.getIntervalStats()["intervals"]
-        jitters = self.getJitterStats(intervals)["jitters"]
 
-        seqs = self.getIcmpSeqsList()
-        rtts = self.getRttStats()["rtts"]
-        lossStats = self.getPacketLossStats()["lossStats"]
-        lossRate = self.getPacketLossStats()["lossRate"]
-
-        intervalGraph = GraphPlotter(xLabel="ICMP sequence number", yLabel="Time (s)")
-        intervalGraph.plotLineGraph(seqs[1:], intervals, color="yellow", plotLabel="Interval between consecutive packets", marker=None)
-        intervalGraph.saveGraph(path+id+"-interval.png")
-
-        jitterGraph = GraphPlotter(xLabel="ICMP sequence number", yLabel="Time (s)")
-        jitterGraph.plotLineGraph(seqs[2:], jitters, color="red", plotLabel="Variation in delay of consecutive packets (Jitter)", marker=None, autoScaleY=True, yScaleFactor=20)
-        jitterGraph.saveGraph(path+id+"-jitter.png")
-        
         layersGraph = GraphPlotter(xLabel="Protocol layers", yLabel="Amount of packets", legendPosition="right")
         layersGraph.plotBarGraph(layers, nLayers, plotLabel=layers)
         layersGraph.saveGraph(path+id+"-layers.png")
+
+    # override
+    def plotRttGraph(self, path):
+        
+        id = self.getId()
+        seqs = self.getIcmpSeqsList()
+        rtts = self.getRttStats()["rtts"]
 
         rttGraph = GraphPlotter(xLabel="ICMP sequence Number", yLabel="Time (s)")
         rttGraph.plotLineGraph(seqs, rtts, color="blue", plotLabel="Round Trip Time", marker=None, autoScaleY=True)
         rttGraph.saveGraph(path+id+"-rtt.png")
 
-        rttJitterGraph = GraphPlotter(None, "ICMP sequence number", "Time (s)")
+    #override
+    def plotRttJitterGraph(self, path):
+
+        id = self.getId()
+        seqs = self.getIcmpSeqsList()
+        rtts = self.getRttStats()["rtts"]
+        intervals = self.getIntervalStats()["intervals"]
+        jitters = self.getJitterStats(intervals)["jitters"]
+
+        rttJitterGraph = GraphPlotter(xLabel="ICMP sequence number", yLabel="Time (s)")
         rttJitterGraph.plotLineGraph(seqs, rtts, color="blue", plotLabel="Round Trip Time", marker=None)
-        rttJitterGraph.plotLineGraph(seqs[2:], jitters, color="red", plotLabel="Variation in delay of consecutive packets (Jitter)", marker=None, autoScaleY=True, yScaleFactor=20)
+        rttJitterGraph.plotLineGraph(seqs[2:], jitters, color="red", plotLabel="Variation in ICMP request packet arrival time interval (Jitter)", marker=None, autoScaleY=True)
         rttJitterGraph.saveGraph(path+id+"-rtt-jitter.png")
+    
+    # override
+    def plotLossGraph(self, path):
+
+        id = self.getId()
+        lossStats = self.getPacketLossStats()["lossStats"]
 
         lossGraph = GraphPlotter(xLabel="Packet loss statistics", yLabel="Amount of packets", legendPosition="right")
         lossGraph.plotBarGraph(["sent", "received", "lost"], lossStats, ["gray", "green", "red"], ["Sent Packets", "Received Packets", "Lost Packets"])
         lossGraph.saveGraph(path+id+"-loss.png")
+    
+    # override
+    def plotLossRateGraph(self, path):
+        
+        id = self.getId()
+        lossRate = self.getPacketLossStats()["lossRate"]
 
         lossRateGraph = GraphPlotter()
         lossRateGraph.plotPizzaGraph(["received packets", "lost packets"], [100-lossRate, lossRate], ["green", "red"])
         lossRateGraph.saveGraph(path+id+"-loss-rate.png")
 
+    # override
+    def plotIntervalHistogram(self, path):
+
+        id = self.getId()
+        intervals = self.getIntervalStats()["intervals"]
+
+        intervalHistogram = GraphPlotter(xLabel="Interval time (s)", yLabel="Frequency", legendFlag=False)
+        intervalHistogram.plotHistogram(intervals, color="yellow", plotLabel="ICMP request packet arrival time interval")
+        intervalHistogram.saveGraph(path+id+"-interval-histogram.png")
+    
+    #override
+    def plotJitterHistogram(self, path):
+
+        id = self.getId()
+        intervals = self.getIntervalStats()["intervals"]
+        jitters = self.getJitterStats(intervals)["jitters"]
+
+        jitterHistogram = GraphPlotter(xLabel="Jitter interval time (s)", yLabel="Frequency", legendFlag=False)
+        jitterHistogram.plotHistogram(jitters, color="red", plotLabel="Variation in ICMP request packet arrival time interval (Jitter)")
+        jitterHistogram.saveGraph(path+id+"-jitter-histogram.png")
+
+    #override
+    def plotRttHistogram(self, path):
+        
+        id = self.getId()
+        rtts = self.getRttStats()["rtts"]
+
+        rttHistogram = GraphPlotter(xLabel="RTT interval time (s)", yLabel="Frequency", legendFlag=False)
+        rttHistogram.plotHistogram(rtts, color="blue", plotLabel="Round Trip Time")
+        rttHistogram.saveGraph(path+id+"-rtt-histogram.png")
+        
+
+        
+        
     

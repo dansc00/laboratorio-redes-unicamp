@@ -140,7 +140,7 @@ class PacketAnalyzer:
     def packetPdfDump(self, filename, pkt):
         self.getPacket(pkt).pdfdump(filename, layer_shift=1)
     
-    # imprime métricas
+    # imprime métricas gerais
     def printMetrics(self):
 
         id = self.getId()
@@ -170,27 +170,74 @@ class PacketAnalyzer:
         print(f"Jitter standard deviation: {stdJitter*1000:.2f} ms")
         print(f"Maximum jitter: {maxJitter*1000:.2f} ms")
         print(f"Minimum jitter: {minJitter*1000:.2f} ms")
-        print(f"Throughput: {throughput} bps")
+        print(f"Throughput: {throughput} Mbps")
         print()
 
-    # plota gráficos gerais
-    def plotGraphs(self, path):
+    # plotagem de gráficos gerais
+
+    def plotIntervalGraph(self, path):
 
         id = self.getId()
-        layers = self.getLayers()["layers"]
-        nLayers = self.getLayers()["nLayers"]
-        intervals = self.getIntervalStats()["intervals"]
-        jitters = self.getJitterStats(intervals)["jitters"]
         nPackets = [i for i in range(1, self.getTotalPackets()+1)]
+        intervals = self.getIntervalStats()["intervals"]
 
         intervalGraph = GraphPlotter(xLabel="Packet capture sequence", yLabel="Time (s)")
         intervalGraph.plotLineGraph(nPackets[1:], intervals, color="yellow", plotLabel="Interval between consecutive packets", marker=None)
         intervalGraph.saveGraph(path+id+"-interval.png")
 
+    def plotJitterGraph(self, path):
+
+        id = self.getId()
+        nPackets = [i for i in range(1, self.getTotalPackets()+1)]
+        intervals = self.getIntervalStats()["intervals"]
+        jitters = self.getJitterStats(intervals)["jitters"]
+
         jitterGraph = GraphPlotter(xLabel="Packet capture sequence", yLabel="Time (s)")
-        jitterGraph.plotLineGraph(nPackets[2:], jitters, color="red", plotLabel="Variation in delay of consecutive packets (Jitter)", marker=None, autoScaleY=True, yScaleFactor=20)
+        jitterGraph.plotLineGraph(nPackets[2:], jitters, color="red", plotLabel="Variation in delay of consecutive packets (Jitter)", marker=None, autoScaleY=True)
         jitterGraph.saveGraph(path+id+"-jitter.png")
-        
+
+    def plotLayersGraph(self, path):
+
+        id = self.getId()
+        layers = self.getLayers()["layers"]
+        nLayers = self.getLayers()["nLayers"]
+
         layersGraph = GraphPlotter(xLabel="Protocol layers", yLabel="Amount of packets", legendPosition="right")
         layersGraph.plotBarGraph(layers, nLayers, plotLabel=layers)
         layersGraph.saveGraph(path+id+"-layers.png")
+
+    def plotIntervalHistogram(self, path):
+
+        id = self.getId()
+        intervals = self.getIntervalStats()["intervals"]
+
+        intervalHistogram = GraphPlotter(xLabel="Interval time (s)", yLabel="Frequency", legendFlag=False)
+        intervalHistogram.plotHistogram(intervals, color="yellow", plotLabel="Interval between consecutive packets")
+        intervalHistogram.saveGraph(path+id+"-interval-histogram.png")
+
+    def plotJitterHistogram(self, path):
+
+        id = self.getId()
+        intervals = self.getIntervalStats()["intervals"]
+        jitters = self.getJitterStats(intervals)["jitters"]
+
+        jitterHistogram = GraphPlotter(xLabel="Jitter interval time (s)", yLabel="Frequency", legendFlag=False)
+        jitterHistogram.plotHistogram(jitters, color="red", plotLabel="Variation in delay of consecutive packets (Jitter)")
+        jitterHistogram.saveGraph(path+id+"-jitter-histogram.png")
+
+    def plotRttGraph(self, path):
+        pass
+
+    def plotRttJitterGraph(self, path):
+        pass
+
+    def plotLossGraph(self, path):
+        pass
+
+    def plotLossRateGraph(self, path):
+        pass
+
+    def plotRttHistogram(self, path):
+        pass
+
+    
