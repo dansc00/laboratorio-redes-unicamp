@@ -16,15 +16,6 @@ class PacketAnalyzer:
             print(f"Capture path is wrong or not specified: {e}")
             sys.exit(1)
 
-    # mensagens de falha
-    def icmpFail(self):
-        print("The packet doesn't have an ICMP layer")
-        return None
-
-    def ipFail(self):
-        print("The packet doesn't have an IP layer")
-        return None
-    
     # retorna todos pacotes
     def getPackets(self):
         return self.packets
@@ -136,7 +127,7 @@ class PacketAnalyzer:
                 "nLayers": nLayers
                 }
     
-    # salva visualização gráfica de pacote
+    # salva visualização gráfica de pacote em pdf
     def packetPdfDump(self, filename, pkt):
         self.getPacket(pkt).pdfdump(filename, layer_shift=1)
     
