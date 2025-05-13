@@ -35,3 +35,9 @@ if __name__ == "__main__":
                 capture2]
     
     makeAllOutput(captures)
+    '''
+    capture1.getPdfDump("h1-dump.pdf", 0)
+    capture1.getPdfDump("h2-dump.pdf", 1)
+    capture2.getPdfDump("h3-dump.pdf", 0)
+    capture2.getPdfDump("h4-dump.pdf", 1)
+    '''

@@ -45,7 +45,7 @@ class PacketAnalyzer(ABC):
     
     # retorna total de bytes capturados
     def getTotalBytes(self):
-        return sum(len(pkt) for pkt in self.packets) if self.getTotalPackets() > 0 else 0
+        return sum(len(pkt) for pkt in self.getPackets()) if self.getTotalPackets() > 0 else 0
     
     # retorna tempo total de captura em ms
     def getTotalTime(self):
@@ -83,7 +83,7 @@ class PacketAnalyzer(ABC):
                 "nLayers": nLayers
                 }
     
-    # retorna estatísticas de jitter baseado na variação de dados: lista de jitters, média, desvio padrão, máximo e mínimo
+    # retorna estatísticas de jitter baseado na variação de dados: lista de jitters, média, desvio padrão, máximo, mínimo, erro padrão e coeficiente de variação
     def getJitterStats(self, data):
         
         if self.getTotalPackets() < 3:
@@ -95,18 +95,20 @@ class PacketAnalyzer(ABC):
         std = np.std(jitters) if len(jitters) > 0 else 0
         max = np.max(jitters) if len(jitters) > 0 else 0
         min = np.min(jitters) if len(jitters) > 0 else 0
-        var = (std/mean)*100 if mean > 0 else 0
+        error = std/np.sqrt(len(jitters)) if len(jitters) > 0 else 0
+        cv = (std/mean)*100 if mean > 0 else 0
 
         return {"jitters": jitters,
                 "mean": mean,
                 "std": std,
                 "max": max,
                 "min": min,
-                "var": var
+                "error": error,
+                "cv": cv
                 }
     
     # salva visualização gráfica de pacote em pdf
-    def packetPdfDump(self, filename, pkt):
+    def getPdfDump(self, filename, pkt):
         self.getPacket(pkt).pdfdump(filename, layer_shift=1)
     
     def getRttStats(self):
@@ -118,50 +120,71 @@ class PacketAnalyzer(ABC):
     def getLossStats(self):
         pass
 
+    # retorna quantidade correta de casas decimais para representação (value ± error)
+    @staticmethod
+    def getDecimalPlaces(error):
+
+        if error == 0:
+            return 0
+        
+        places = np.floor(np.log10(np.abs(error)))
+
+        return max(0, int(-places))
+
     # imprime métricas gerais
-    def printGeneralMetrics(self, id, totalPackets, totalBytes, layers, throughput):
+    def printGeneralMetrics(self, id, src, dst, totalPackets, totalBytes, layers, throughput):
 
         print(f"Capture {id}")
+        print(f"Source IPv4: {src}")
+        print(f"Destination IPv4: {dst}")
         print(f"Total packets: {totalPackets}")
         print(f"Total bytes: {totalBytes} bytes")
         print(f"Layers: {layers}")
         print(f"Throughput: {throughput:.4f} Mbps\n")
 
     # imprime métricas de RTT
-    def printRttMetrics(self, layer, mean, std, max, min, var):
+    def printRttMetrics(self, layer, mean, std, max, min, error, cv):
         
-        print(f"Mean {layer} RTT: {mean:.2f} ms")
-        print(f"{layer} RTT standard deviation: {std:.2f} ms")
-        print(f"Maximum {layer} RTT: {max:.2f} ms")
-        print(f"Minimum {layer} RTT: {min:.2f} ms")
-        print(f"Percentage of standard deviation from the mean: {var:.2f}%\n")
+        places = self.getDecimalPlaces(error)
+        print(f"Mean {layer} RTT: {mean:.{places}f} ms")
+        print(f"{layer} RTT standard deviation: {std:.{places}f} ms")
+        print(f"Maximum {layer} RTT: {max:.{places}f} ms")
+        print(f"Minimum {layer} RTT: {min:.{places}f} ms")
+        print(f"Standard error: {error:.{places}f} ms")
+        print(f"Percentage of standard deviation from the mean: {cv:.2f}%\n")
     
     # imprime métricas de intervalo de chegada entre pacotes
-    def printIntervalMetrics(self, layer, mean, std, max, min, var):
+    def printIntervalMetrics(self, layer, mean, std, max, min, error, cv):
 
-        print(f"Mean {layer} packets arrival time interval: {mean:.2f} ms")
-        print(f"Standard deviation of {layer} packets arrival time interval: {std:.2f} ms")
-        print(f"Maximum {layer} packet arrival time interval: {max:.2f} ms")
-        print(f"Minimum {layer} request packet arrival time Interval: {min:.2f} ms")
-        print(f"Percentage of standard deviation from the mean: {var:.2f}%\n")
+        places = self.getDecimalPlaces(error)
+        print(f"Mean {layer} packets arrival time interval: {mean:.{places}f} ms")
+        print(f"Standard deviation of {layer} packets arrival time interval: {std:.{places}f} ms")
+        print(f"Maximum {layer} packet arrival time interval: {max:.{places}f} ms")
+        print(f"Minimum {layer} request packet arrival time Interval: {min:.{places}f} ms")
+        print(f"Standard error: {error:.{places}f} ms")
+        print(f"Percentage of standard deviation from the mean: {cv:.2f}%\n")
 
     # imprime métricas de jitter baseado em rtt
-    def printRttJitterMetrics(self, layer, mean, std, max, min, var):
+    def printRttJitterMetrics(self, layer, mean, std, max, min, error, cv):
 
-        print(f"{layer} RTT based jitter mean: {mean:.2f} ms")
-        print(f"{layer} RTT based jitter standard deviation: {std:.2f} ms")
-        print(f"{layer} RTT based maximum jitter: {max:.2f} ms")
-        print(f"{layer} RTT based minimum jitter: {min:.2f} ms")
-        print(f"Percentage of standard deviation from the mean: {var:.2f}%\n")
+        places = self.getDecimalPlaces(error)
+        print(f"{layer} RTT based jitter mean: {mean:.{places}f} ms")
+        print(f"{layer} RTT based jitter standard deviation: {std:.{places}f} ms")
+        print(f"{layer} RTT based maximum jitter: {max:.{places}f} ms")
+        print(f"{layer} RTT based minimum jitter: {min:.{places}f} ms")
+        print(f"Standard error: {error:.{places}f} ms")
+        print(f"Percentage of standard deviation from the mean: {cv:.2f}%\n")
 
     # imprime métricas de jitter baseado em intervalo de chegada
-    def printIntervalJitterMetrics(self, layer, mean, std, max, min, var):
+    def printIntervalJitterMetrics(self, layer, mean, std, max, min, error, cv):
 
-        print(f"{layer} arrival time interval based jitter mean: {mean:.2f} ms")
-        print(f"{layer} arrival time interval based jitter standard deviation: {std:.2f} ms")
-        print(f"{layer} arrival time interval based maximum jitter: {max:.2f} ms")
-        print(f"{layer} arrival time interval based minimum jitter: {min:.2f} ms")
-        print(f"Percentage of standard deviation from the mean: {var:.2f}%\n")
+        places = self.getDecimalPlaces(error)
+        print(f"{layer} arrival time interval based jitter mean: {mean:.{places}f} ms")
+        print(f"{layer} arrival time interval based jitter standard deviation: {std:.{places}f} ms")
+        print(f"{layer} arrival time interval based maximum jitter: {max:.{places}f} ms")
+        print(f"{layer} arrival time interval based minimum jitter: {min:.{places}f} ms")
+        print(f"Standard error: {error:.{places}f} ms")
+        print(f"Percentage of standard deviation from the mean: {cv:.2f}%\n")
     
     # imprime métricas de perda de pacotes
     def printLossMetrics(self, layer, sent, received, lost, lossRate):

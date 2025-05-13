@@ -4,3 +4,4 @@
 /project1/client/client
 /project1/server/server
 __pycache__/
+*.png

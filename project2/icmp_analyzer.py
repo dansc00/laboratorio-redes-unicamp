@@ -1,7 +1,6 @@
 from scapy.all import *
 import numpy as np
 from packet_analyzer import PacketAnalyzer
-from graph_plotter import GraphPlotter
 from ip_analyzer import IpAnalyzer
 
 # analisador de camada ICMP
@@ -40,7 +39,7 @@ class IcmpAnalyzer(PacketAnalyzer):
 
         return sorted(list(seqsList)) if seqsList else []
 
-    # retorna estatísticas de rtt ICMP: lista de rtt, desvio padrão, média, máximo, mínimo
+    # retorna estatísticas de rtt ICMP: lista de rtt, desvio padrão, média, máximo, mínimo, erro padrão e coeficiente de variação
     # override
     def getRttStats(self):
 
@@ -62,17 +61,19 @@ class IcmpAnalyzer(PacketAnalyzer):
         std = np.std(rtts) if len(rtts) > 0 else 0
         max = np.max(rtts) if len(rtts) > 0 else 0
         min = np.min(rtts) if len(rtts) > 0 else 0
-        var = (std/mean)*100 if mean > 0 else 0
+        error = std/np.sqrt(len(rtts)) if len(rtts) > 0 else 0
+        cv = (std/mean)*100 if mean > 0 else 0
 
         return {"rtts": rtts,
                 "mean": mean,
                 "std": std,
                 "max": max,
                 "min": min,
-                "var": var
+                "error": error,
+                "cv": cv
                 }
     
-    # retorna estatísticas de intervalo de chegada entre requisições ICMP: lista de intervalos, média, desvio padrão, máximo e mínimo
+    # retorna estatísticas de intervalo de chegada entre requisições ICMP: lista de intervalos, média, desvio padrão, máximo, mínimo, erro padrão e coeficiente de variação
     # override
     def getIntervalStats(self):
 
@@ -92,14 +93,16 @@ class IcmpAnalyzer(PacketAnalyzer):
         std = np.std(intervals) if len(intervals) > 0 else 0
         max = np.max(intervals) if len(intervals) > 0 else 0
         min = np.min(intervals) if len(intervals) > 0 else 0
-        var = (std/mean)*100 if mean > 0 else 0
+        error = std/np.sqrt(len(intervals)) if len(intervals) > 0 else 0
+        cv = (std/mean)*100 if mean > 0 else 0
 
         return {"intervals": intervals,
                 "mean": mean,
                 "std": std,
                 "max": max,
                 "min": min,
-                "var": var
+                "error": error,
+                "cv": cv
                 } 
 
     # retorna estatísticas de perda de pacotes: enviados, recebidos, perdidos, taxa de perdas
@@ -134,12 +137,14 @@ class IcmpAnalyzer(PacketAnalyzer):
     def printGeneralMetrics(self):
 
         id = self.getId()
+        src = IpAnalyzer.getSrcIp(self.getPacket(0))
+        dst = IpAnalyzer.getDstIp(self.getPacket(0))
         totalPackets = self.getTotalPackets()
         totalBytes = self.getTotalBytes()
         layers = self.getLayers()["layers"]
         throughput = self.getThroughput()
 
-        return super().printGeneralMetrics(id, totalPackets, totalBytes, layers, throughput)
+        return super().printGeneralMetrics(id, src, dst, totalPackets, totalBytes, layers, throughput)
 
     # override
     def printRttMetrics(self):
@@ -149,9 +154,10 @@ class IcmpAnalyzer(PacketAnalyzer):
         std = self.getRttStats()["std"]
         max = self.getRttStats()["max"]
         min = self.getRttStats()["min"]
-        var = self.getRttStats()["var"]
+        error = self.getRttStats()["error"]
+        cv = self.getRttStats()["cv"]
 
-        return super().printRttMetrics(layer, mean, std, max, min, var)
+        return super().printRttMetrics(layer, mean, std, max, min, error, cv)
     
     # override
     def printIntervalMetrics(self):
@@ -161,9 +167,10 @@ class IcmpAnalyzer(PacketAnalyzer):
         std = self.getIntervalStats()["std"]
         max = self.getIntervalStats()["max"]
         min = self.getIntervalStats()["min"]
-        var = self.getIntervalStats()["var"]
+        error = self.getIntervalStats()["error"]
+        cv = self.getIntervalStats()["cv"]
 
-        return super().printIntervalMetrics(layer, mean, std, max, min, var)
+        return super().printIntervalMetrics(layer, mean, std, max, min, error, cv)
     
     # override
     def printRttJitterMetrics(self):
@@ -174,9 +181,10 @@ class IcmpAnalyzer(PacketAnalyzer):
         std = self.getJitterStats(rtts)["std"]
         max = self.getJitterStats(rtts)["max"]
         min = self.getJitterStats(rtts)["min"]
-        var = self.getJitterStats(rtts)["var"]
+        error = self.getJitterStats(rtts)["error"]
+        cv = self.getJitterStats(rtts)["cv"]
 
-        return super().printRttJitterMetrics(layer, mean, std, max, min, var)
+        return super().printRttJitterMetrics(layer, mean, std, max, min, error, cv)
     
     # override
     def printIntervalJitterMetrics(self):
@@ -187,9 +195,10 @@ class IcmpAnalyzer(PacketAnalyzer):
         std = self.getJitterStats(intervals)["std"]
         max = self.getJitterStats(intervals)["max"]
         min = self.getJitterStats(intervals)["min"]
-        var = self.getJitterStats(intervals)["var"]
+        error = self.getJitterStats(intervals)["error"]
+        cv = self.getJitterStats(intervals)["cv"]
 
-        return super().printIntervalJitterMetrics(layer, mean, std, max, min, var)
+        return super().printIntervalJitterMetrics(layer, mean, std, max, min, error, cv)
     
     # override
     def printLossMetrics(self):
