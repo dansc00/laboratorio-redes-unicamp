@@ -318,5 +318,5 @@ class GraphPlotter:
 
 if __name__ == "__main__":
 
-    plt = GraphPlotter()
-    plt.plotUserInput()
+    plot = GraphPlotter()
+    plot.plotUserInput()
