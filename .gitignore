@@ -5,3 +5,4 @@
 /project1/server/server
 __pycache__/
 *.png
+*.pcap
