@@ -1,4 +1,4 @@
-from icmp_analyzer import IcmpAnalyzer
+from packet_analyzer.icmp_analyzer.icmp_analyzer import IcmpAnalyzer
 
 # imprime métricas e salva gráficos de todas capturas da lista
 def makeAllOutput(captures):
