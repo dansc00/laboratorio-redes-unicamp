@@ -206,7 +206,7 @@ class PacketAnalyzer(ABC):
     def plotRttGraph(self, path, id, xAxis, rtts, title, xLabel, yLabel):
 
         rttGraph = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel)
-        rttGraph.plotLineGraph(xAxis, rtts, color="blue", plotLabel="Round Trip Time", marker=None, autoScaleY=True, xScale="log", base=2)
+        rttGraph.plotLineGraph(xAxis, rtts, color="blue", plotLabel="Round Trip Time", marker=None, autoScaleY=True)
         rttGraph.saveGraph(path+id+"-rtt.png")
 
     # plota gráfico de intervalos de chegada entre pacotes
