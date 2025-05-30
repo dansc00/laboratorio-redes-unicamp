@@ -215,8 +215,8 @@ class GraphPlotter:
             print(f"Error saving graph: {e}")
 
     # plot using object attributes or method arguments 
-    def plotLineGraph(self, x, y, color=None, plotLabel=None, xLabel=None, yLabel=None, title=None, grid=None, marker='o', linestyle='-', autoScaleY=False, 
-                      autoScaleX=False, yScaleFactor=3, xScaleFactor=3, yScaleStart=0, xScaleStart=0):
+    def plotLineGraph(self, x, y, color=None, plotLabel=None, xLabel=None, yLabel=None, title=None, grid=None, marker="o", linestyle="-", autoScaleY=False, 
+                      autoScaleX=False, yScaleFactor=3, xScaleFactor=3, yScaleStart=0, xScaleStart=0, yScale="linear", xScale="linear", base=None):
 
         color = self.getColor(color, self.plotCount)
         self.plotCount += 1
@@ -225,6 +225,8 @@ class GraphPlotter:
 
         self.axis.set_xlabel(xLabel or self.xLabel)
         self.axis.set_ylabel(yLabel or self.yLabel)
+        self.axis.set_xscale(xScale)
+        self.axis.set_yscale(yScale)
         self.axis.set_title(title or self.title)
         self.axis.grid(self.grid if grid is None else grid)
 

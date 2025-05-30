@@ -141,7 +141,7 @@ class IcmpAnalyzer(PacketAnalyzer):
         dst = IpAnalyzer.getDstIp(self.getPacket(0))
         totalPackets = self.getTotalPackets()
         totalBytes = self.getTotalBytes()
-        layers = self.getLayers()["layers"]
+        layers = self.getLayers().get("layers")
         throughput = self.getThroughput()
 
         return super().printGeneralMetrics(id, src, dst, totalPackets, totalBytes, layers, throughput)
@@ -150,12 +150,12 @@ class IcmpAnalyzer(PacketAnalyzer):
     def printRttMetrics(self):
 
         layer = "ICMP"
-        mean = self.getRttStats()["mean"]
-        std = self.getRttStats()["std"]
-        max = self.getRttStats()["max"]
-        min = self.getRttStats()["min"]
-        error = self.getRttStats()["error"]
-        cv = self.getRttStats()["cv"]
+        mean = self.getRttStats().get("mean")
+        std = self.getRttStats().get("std")
+        max = self.getRttStats().get("max")
+        min = self.getRttStats().get("min")
+        error = self.getRttStats().get("error")
+        cv = self.getRttStats().get("cv")
 
         return super().printRttMetrics(layer, mean, std, max, min, error, cv)
     
@@ -163,12 +163,12 @@ class IcmpAnalyzer(PacketAnalyzer):
     def printIntervalMetrics(self):
 
         layer = "ICMP"
-        mean = self.getIntervalStats()["mean"]
-        std = self.getIntervalStats()["std"]
-        max = self.getIntervalStats()["max"]
-        min = self.getIntervalStats()["min"]
-        error = self.getIntervalStats()["error"]
-        cv = self.getIntervalStats()["cv"]
+        mean = self.getIntervalStats().get("mean")
+        std = self.getIntervalStats().get("std")
+        max = self.getIntervalStats().get("max")
+        min = self.getIntervalStats().get("min")
+        error = self.getIntervalStats().get("error")
+        cv = self.getIntervalStats().get("cv")
 
         return super().printIntervalMetrics(layer, mean, std, max, min, error, cv)
     
@@ -176,13 +176,13 @@ class IcmpAnalyzer(PacketAnalyzer):
     def printRttJitterMetrics(self):
 
         layer = "ICMP"
-        rtts = self.getRttStats()["rtts"]
-        mean = self.getJitterStats(rtts)["mean"]
-        std = self.getJitterStats(rtts)["std"]
-        max = self.getJitterStats(rtts)["max"]
-        min = self.getJitterStats(rtts)["min"]
-        error = self.getJitterStats(rtts)["error"]
-        cv = self.getJitterStats(rtts)["cv"]
+        rtts = self.getRttStats().get("rtts")
+        mean = self.getJitterStats(rtts).get("mean")
+        std = self.getJitterStats(rtts).get("std")
+        max = self.getJitterStats(rtts).get("max")
+        min = self.getJitterStats(rtts).get("min")
+        error = self.getJitterStats(rtts).get("error")
+        cv = self.getJitterStats(rtts).get("cv")
 
         return super().printRttJitterMetrics(layer, mean, std, max, min, error, cv)
     
@@ -190,13 +190,13 @@ class IcmpAnalyzer(PacketAnalyzer):
     def printIntervalJitterMetrics(self):
 
         layer = "ICMP"
-        intervals = self.getIntervalStats()["intervals"]
-        mean = self.getJitterStats(intervals)["mean"]
-        std = self.getJitterStats(intervals)["std"]
-        max = self.getJitterStats(intervals)["max"]
-        min = self.getJitterStats(intervals)["min"]
-        error = self.getJitterStats(intervals)["error"]
-        cv = self.getJitterStats(intervals)["cv"]
+        intervals = self.getIntervalStats().get("intervals")
+        mean = self.getJitterStats(intervals).get("mean")
+        std = self.getJitterStats(intervals).get("std")
+        max = self.getJitterStats(intervals).get("max")
+        min = self.getJitterStats(intervals).get("min")
+        error = self.getJitterStats(intervals).get("error")
+        cv = self.getJitterStats(intervals).get("cv")
 
         return super().printIntervalJitterMetrics(layer, mean, std, max, min, error, cv)
     
@@ -204,10 +204,10 @@ class IcmpAnalyzer(PacketAnalyzer):
     def printLossMetrics(self):
 
         layer = "ICMP"
-        sent = self.getLossStats()["sent"]
-        received = self.getLossStats()["received"]
-        lost = self.getLossStats()["lost"]
-        lossRate = self.getLossStats()["lossRate"]
+        sent = self.getLossStats().get("sent")
+        received = self.getLossStats().get("received")
+        lost = self.getLossStats().get("lost")
+        lossRate = self.getLossStats().get("lossRate")
 
         return super().printLossMetrics(layer, sent, received, lost, lossRate)
     
@@ -216,8 +216,8 @@ class IcmpAnalyzer(PacketAnalyzer):
     def plotLayersGraph(self, path):
 
         id = self.getId()
-        layers = self.getLayers()["layers"]
-        nLayers = self.getLayers()["nLayers"]
+        layers = self.getLayers().get("layers")
+        nLayers = self.getLayers().get("nLayers")
         title = None
         xLabel = "Protocol layers"
         yLabel = "Amount of packets"
@@ -229,7 +229,7 @@ class IcmpAnalyzer(PacketAnalyzer):
 
         id = self.getId()
         xAxis = self.getIcmpSeqsList()
-        rtts = self.getRttStats()["rtts"]
+        rtts = self.getRttStats().get("rtts")
         title = None
         xLabel = "ICMP sequence number"
         yLabel = "Time (ms)"
@@ -241,7 +241,7 @@ class IcmpAnalyzer(PacketAnalyzer):
 
         id = self.getId()
         xAxis = self.getIcmpSeqsList()
-        intervals = self.getIntervalStats()["intervals"]
+        intervals = self.getIntervalStats().get("intervals")
         title = None
         xLabel = "ICMP sequence number"
         yLabel = "Time (ms)"
@@ -252,9 +252,9 @@ class IcmpAnalyzer(PacketAnalyzer):
     def plotRttJitterGraph(self, path):
 
         id = self.getId()
-        rtts = self.getRttStats()["rtts"]
+        rtts = self.getRttStats().get("rtts")
         xAxis = self.getIcmpSeqsList()
-        jitters = self.getJitterStats(rtts)["jitters"]
+        jitters = self.getJitterStats(rtts).get("jitters")
         title = None
         xLabel = "ICMP sequence number"
         yLabel = "Time (ms)"
@@ -265,9 +265,9 @@ class IcmpAnalyzer(PacketAnalyzer):
     def plotIntervalJitterGraph(self, path):
 
         id = self.getId()
-        intervals = self.getIntervalStats()["intervals"]
+        intervals = self.getIntervalStats().get("intervals")
         xAxis = self.getIcmpSeqsList()
-        jitters = self.getJitterStats(intervals)["jitters"]
+        jitters = self.getJitterStats(intervals).get("jitters")
         title = None
         xLabel = "ICMP sequence number"
         yLabel = "Time (ms)"
@@ -278,7 +278,7 @@ class IcmpAnalyzer(PacketAnalyzer):
     def plotRttHistogram(self, path):
 
         id = self.getId()
-        rtts = self.getRttStats()["rtts"]
+        rtts = self.getRttStats().get("rtts")
         title = None
         xLabel = "RTT interval (ms)"
         yLabel = "Frequency"
@@ -289,7 +289,7 @@ class IcmpAnalyzer(PacketAnalyzer):
     def plotIntervalHistogram(self, path):
 
         id = self.getId()
-        intervals = self.getIntervalStats()["intervals"]
+        intervals = self.getIntervalStats().get("intervals")
         title = None
         xLabel = "Packet arrival time interval (ms)"
         yLabel = "Frequency"
@@ -300,8 +300,8 @@ class IcmpAnalyzer(PacketAnalyzer):
     def plotRttJitterHistogram(self, path):
 
         id = self.getId()
-        rtts = self.getRttStats()["rtts"]
-        jitters = self.getJitterStats(rtts)["jitters"]
+        rtts = self.getRttStats().get("rtts")
+        jitters = self.getJitterStats(rtts).get("jitters")
         title = None
         xLabel = "Jitter interval (ms)"
         yLabel = "Frequency"
@@ -312,8 +312,8 @@ class IcmpAnalyzer(PacketAnalyzer):
     def plotIntervalJitterHistogram(self, path):
 
         id = self.getId()
-        intervals = self.getIntervalStats()["intervals"]
-        jitters = self.getJitterStats(intervals)["jitters"]
+        intervals = self.getIntervalStats().get("intervals")
+        jitters = self.getJitterStats(intervals).get("jitters")
         title = None
         xLabel = "Jitter interval (ms)"
         yLabel = "Frequency"
@@ -324,7 +324,7 @@ class IcmpAnalyzer(PacketAnalyzer):
     def plotLossGraph(self, path):
 
         id = self.getId()
-        lossStats = self.getLossStats()["lossStats"]
+        lossStats = self.getLossStats().get("lossStats")
         title = None
         xLabel = "Statistics"
         yLabel = "Amount of packets"
@@ -335,6 +335,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     def plotLossRateGraph(self, path):
 
         id = self.getId()
-        lossRate = self.getLossStats()["lossRate"]
+        lossRate = self.getLossStats().get("lossRate")
 
         return super().plotLossRateGraph(path, id, lossRate)
