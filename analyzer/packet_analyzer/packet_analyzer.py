@@ -2,7 +2,7 @@ from scapy.all import *
 from abc import ABC, abstractmethod
 from collections import Counter
 import numpy as np
-from packet_analyzer.graph_plotter.graph_plotter import GraphPlotter
+from analyzer.graph_plotter.graph_plotter import GraphPlotter
 import sys
 
 # analisador de pacotes em capturas .pcap
