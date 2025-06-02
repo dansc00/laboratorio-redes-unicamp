@@ -1,14 +1,12 @@
 from scapy.all import *
-from abc import ABC, abstractmethod
 from collections import Counter
 import numpy as np
 from analyzer.graph_plotter.graph_plotter import GraphPlotter
 import sys
 
 # analisador de pacotes em capturas .pcap
-class PacketAnalyzer(ABC):
+class PacketAnalyzer():
 
-    @abstractmethod
     def __init__(self, id=None, packetsMargin=None, path=None):
         self.id = id
         self.packetsMargin = packetsMargin
