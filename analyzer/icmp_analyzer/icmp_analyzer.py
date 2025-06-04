@@ -38,6 +38,18 @@ class IcmpAnalyzer(PacketAnalyzer):
                 seqsList.add(self.getIcmpSeq(pkt))
 
         return sorted(list(seqsList)) if seqsList else []
+    
+    # retorna lista de tuplas (ip origem, ip destino, icmp id, icmp seq) para cada pacote ICMP  
+    def getIcmpKeys(self):
+
+        icmpKeys = set()
+
+        for pkt in self.getPackets():
+            if ICMP in pkt:
+                key = (IpAnalyzer.getSrcIp(pkt), IpAnalyzer.getDstIp(pkt), pkt[ICMP].id, pkt[ICMP].seq)
+                icmpKeys.add(key)
+        
+        return list(icmpKeys) if icmpKeys else []
 
     # retorna estatísticas de rtt ICMP: lista de rtt, desvio padrão, média, máximo, mínimo, erro padrão e coeficiente de variação
     # override
@@ -137,14 +149,17 @@ class IcmpAnalyzer(PacketAnalyzer):
     def printGeneralMetrics(self):
 
         id = self.getId()
-        src = IpAnalyzer.getSrcIp(self.getPacket(0))
-        dst = IpAnalyzer.getDstIp(self.getPacket(0))
+        keys = self.getIcmpKeys()
         totalPackets = self.getTotalPackets()
         totalBytes = self.getTotalBytes()
         layers = self.getLayers().get("layers")
         throughput = self.getThroughput()
 
-        return super().printGeneralMetrics(id, src, dst, totalPackets, totalBytes, layers, throughput)
+        print("ICMP keys:")
+        for key in keys:
+            print(key)
+
+        return super().printGeneralMetrics(id, totalPackets, totalBytes, layers, throughput)
 
     # override
     def printRttMetrics(self):

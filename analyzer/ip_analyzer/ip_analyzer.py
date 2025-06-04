@@ -2,7 +2,7 @@ from scapy.all import *
 import numpy as np
 from analyzer.packet_analyzer.packet_analyzer import PacketAnalyzer
 
-# analisador de camada IP
+# analisador de camada IPv4
 class IpAnalyzer(PacketAnalyzer):
 
     def __init__(self, id=None, path=None):

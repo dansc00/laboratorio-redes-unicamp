@@ -244,17 +244,26 @@ class GraphPlotter:
             xMean = sum(x) / len(x)
             self.axis.set_xlim(xScaleStart, xMean * xScaleFactor)
 
-    def plotBarGraph(self, x, y, color=None, plotLabel=None, xLabel=None, yLabel=None, title=None, grid=None, align="center", edgecolor="black"):
+    def plotBarGraph(self, x, y, color=None, plotLabel=None, xLabel=None, yLabel=None, title=None, grid=None, align="center", edgecolor="black", horizontal=False):
 
         self.plotCount += 1
 
         if isinstance(color, list) and isinstance(plotLabel, list):
             for i in range(len(x)):
                 barColor = self.getColor(color[i], self.plotCount) if isinstance(color[i], (Color, str)) else self.getColor(None, self.plotCount)
-                self.axis.bar(x[i], y[i], color=barColor, label=plotLabel[i], align=align, edgecolor=edgecolor)
+
+                if horizontal:
+                    self.axis.barh(x[i], y[i], color=barColor, label=None, align=align, edgecolor=edgecolor)
+                else:
+                    self.axis.bar(x[i], y[i], color=barColor, label=plotLabel[i], align=align, edgecolor=edgecolor)
+
         else:
             barColor = [self.getColor(color, i) for i in range(len(x))]
-            self.axis.bar(x, y, color=barColor, label=plotLabel, align=align, edgecolor=edgecolor)
+
+            if horizontal:
+                self.axis.barh(x, y, color=barColor, label=None, align=align, edgecolor=edgecolor)
+            else:
+                self.axis.bar(x, y, color=barColor, label=plotLabel, align=align, edgecolor=edgecolor)
 
         self.axis.set_xlabel(xLabel or self.xLabel)
         self.axis.set_ylabel(yLabel or self.yLabel)
