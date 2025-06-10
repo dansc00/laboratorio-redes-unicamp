@@ -1,12 +1,11 @@
-from scapy.all import *
+from scapy.all import rdpcap
 from collections import Counter
 import numpy as np
-from analyzer.graph_plotter.graph_plotter import GraphPlotter
+from analyzer.graph_plotter import GraphPlotter
 import sys
 
 # analisador de pacotes em capturas .pcap
 class PacketAnalyzer():
-
     def __init__(self, id=None, packetsMargin=None, path=None):
         self.id = id
         self.packetsMargin = packetsMargin
@@ -19,12 +18,11 @@ class PacketAnalyzer():
 
     # retorna pacotes, pode excluir os n primeiros e n últimos para evitar viés de borda
     def getPackets(self):
-
         if self.packetsMargin != None:
             return self.packets[self.packetsMargin:-self.packetsMargin]
         else:
             return self.packets
-    
+        
     # retorna pacote específico
     def getPacket(self, pkt):
         return self.getPackets()[pkt] if len(self.getPackets()) > 0 else 0
@@ -51,7 +49,7 @@ class PacketAnalyzer():
     
     # retorna pacotes capturados por segundo
     def getCaptureRate(self):
-        return self.getTotalPackets()/self.getTotalTime() if self.getTotalTime > 0 else 0
+        return self.getTotalPackets()/self.getTotalTime() if self.getTotalTime() > 0 else 0
 
     # recebe dois pacotes e retorna a diferença de tempo de captura entre eles
     def getTimeDiff(self, pkt1, pkt2):
@@ -59,14 +57,12 @@ class PacketAnalyzer():
     
     # retorna throughput medido em Mbps
     def getThroughput(self):
-
         totalBits = self.getTotalBytes() * 8
 
         return (totalBits/self.getTotalTime())/1000 if self.getTotalTime() > 0 else 0
     
     # retorna lista de camadas e quantidade total encontrada por camada
     def getLayers(self):
-        
         layers = Counter() 
 
         for pkt in self.getPackets():
@@ -82,8 +78,7 @@ class PacketAnalyzer():
                 }
     
     # retorna estatísticas de jitter baseado na variação de dados: lista de jitters, média, desvio padrão, máximo, mínimo, erro padrão e coeficiente de variação
-    def getJitterStats(self, data):
-        
+    def getJitterStats(self, data):       
         if self.getTotalPackets() < 3:
             print("There is no way to measure jitter with less than three packets")
             return None
@@ -108,6 +103,9 @@ class PacketAnalyzer():
     # salva visualização gráfica de pacote em pdf
     def getPdfDump(self, filename, pkt):
         self.getPacket(pkt).pdfdump(filename, layer_shift=1)
+
+    def getPacketByKey(self, key):
+        pass
     
     def getRttStats(self):
         pass
@@ -121,7 +119,6 @@ class PacketAnalyzer():
     # retorna quantidade correta de casas decimais para representação (value ± error)
     @staticmethod
     def getDecimalPlaces(error):
-
         if error == 0:
             return 0
         
@@ -131,7 +128,6 @@ class PacketAnalyzer():
 
     # imprime métricas gerais
     def printGeneralMetrics(self, id, totalPackets, totalBytes, layers, throughput):
-
         print(f"Capture {id}")
         print(f"Total packets: {totalPackets}")
         print(f"Total bytes: {totalBytes} bytes")
@@ -139,8 +135,7 @@ class PacketAnalyzer():
         print(f"Throughput: {throughput:.4f} Mbps\n")
 
     # imprime métricas de RTT
-    def printRttMetrics(self, layer, mean, std, max, min, error, cv):
-        
+    def printRttMetrics(self, layer, mean, std, max, min, error, cv):       
         places = self.getDecimalPlaces(error)
         print(f"Mean {layer} RTT: {mean:.{places}f} ms")
         print(f"{layer} RTT standard deviation: {std:.{places}f} ms")
@@ -151,7 +146,6 @@ class PacketAnalyzer():
     
     # imprime métricas de intervalo de chegada entre pacotes
     def printIntervalMetrics(self, layer, mean, std, max, min, error, cv):
-
         places = self.getDecimalPlaces(error)
         print(f"Mean {layer} packets arrival time interval: {mean:.{places}f} ms")
         print(f"Standard deviation of {layer} packets arrival time interval: {std:.{places}f} ms")
@@ -162,7 +156,6 @@ class PacketAnalyzer():
 
     # imprime métricas de jitter baseado em rtt
     def printRttJitterMetrics(self, layer, mean, std, max, min, error, cv):
-
         places = self.getDecimalPlaces(error)
         print(f"{layer} RTT based jitter mean: {mean:.{places}f} ms")
         print(f"{layer} RTT based jitter standard deviation: {std:.{places}f} ms")
@@ -173,7 +166,6 @@ class PacketAnalyzer():
 
     # imprime métricas de jitter baseado em intervalo de chegada
     def printIntervalJitterMetrics(self, layer, mean, std, max, min, error, cv):
-
         places = self.getDecimalPlaces(error)
         print(f"{layer} arrival time interval based jitter mean: {mean:.{places}f} ms")
         print(f"{layer} arrival time interval based jitter standard deviation: {std:.{places}f} ms")
@@ -184,7 +176,6 @@ class PacketAnalyzer():
     
     # imprime métricas de perda de pacotes
     def printLossMetrics(self, layer, sent, received, lost, lossRate):
-
         print(f"{layer} sent packets: {sent}")
         print(f"{layer} received packets: {received}")
         print(f"{layer} lost packets: {lost}")
@@ -193,77 +184,66 @@ class PacketAnalyzer():
 
     # plota gráfico de barra para o total de camadas
     def plotLayersGraph(self, path, id, layers, nLayers, title=None, xLabel=None, yLabel=None, legendFlag=True, horizontal=False):
-
         layersGraph = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel, legendFlag=legendFlag, legendPosition="right")
         layersGraph.plotBarGraph(layers, nLayers, plotLabel=layers, horizontal=horizontal)
         layersGraph.saveGraph(path+id+"-layers.png")
 
     # plota gráfico de rtt 
     def plotRttGraph(self, path, id, xAxis, rtts, title=None, xLabel=None, yLabel=None):
-
         rttGraph = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel)
         rttGraph.plotLineGraph(xAxis, rtts, color="blue", plotLabel="Round Trip Time", marker=None, autoScaleY=True)
         rttGraph.saveGraph(path+id+"-rtt.png")
 
     # plota gráfico de intervalos de chegada entre pacotes
     def plotIntervalGraph(self, path, id, xAxis, intervals, title=None, xLabel=None, yLabel=None):
-
         intervalGraph = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel)
         intervalGraph.plotLineGraph(xAxis, intervals, color="yellow", plotLabel="Packets arrival time interval", marker=None)
         intervalGraph.saveGraph(path+id+"-interval.png")
 
     # plota gráfico de jitter baseado em rtt
     def plotRttJitterGraph(self, path, id, xAxis, jitters, title=None, xLabel=None, yLabel=None):
-
         rttJitterGraph = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel)
         rttJitterGraph.plotLineGraph(xAxis, jitters, color="red", plotLabel="RTT based Jitter", marker=None)
         rttJitterGraph.saveGraph(path+id+"-rtt-jitter.png")
 
     # plota gráfico de jitter baseado em intervalo de chegada
-    def plotIntervalJitterGraph(self, path, id, xAxis, jitters, title=None, xLabel=None, yLabel=None):
-        
+    def plotIntervalJitterGraph(self, path, id, xAxis, jitters, title=None, xLabel=None, yLabel=None):       
         intervalJitterGraph = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel)
         intervalJitterGraph.plotLineGraph(xAxis, jitters, color="orange", plotLabel="Arrival time interval based Jitter", marker=None)
         intervalJitterGraph.saveGraph(path+id+"-interval-jitter.png")
 
     # plota histograma de rtt
-    def plotRttHistogram(self, path, id, rtts, title=None, xLabel=None, yLabel=None):
-        
+    def plotRttHistogram(self, path, id, rtts, title=None, xLabel=None, yLabel=None):        
         rttHistogram = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel, legendFlag=False)
         rttHistogram.plotHistogram(rtts, color="blue")
         rttHistogram.saveGraph(path+id+"-rtt-histogram.png")
     
     # plota histograma de intervalos de chegada
-    def plotIntervalHistogram(self, path, id, intervals, title=None, xLabel=None, yLabel=None):
-        
+    def plotIntervalHistogram(self, path, id, intervals, title=None, xLabel=None, yLabel=None):       
         intervalHistogram = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel, legendFlag=False)
         intervalHistogram.plotHistogram(intervals, color="yellow")
         intervalHistogram.saveGraph(path+id+"-interval-histogram.png")
 
     # plota histograma de jitter baseado em rtt
     def plotRttJitterHistogram(self, path, id, jitters, title=None, xLabel=None, yLabel=None):
-
         jitterHistogram = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel, legendFlag=False)
         jitterHistogram.plotHistogram(jitters, color="red")
         jitterHistogram.saveGraph(path+id+"-rtt-jitter-histogram.png")
 
     # plota histogram de jitter baseado em intervalo de chegada
     def plotIntervalJitterHistogram(self, path, id, jitters, title=None, xLabel=None, yLabel=None):
-
         jitterHistogram = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel, legendFlag=False)
         jitterHistogram.plotHistogram(jitters, color="orange")
         jitterHistogram.saveGraph(path+id+"-interval-jitter-histogram.png")
     
     # plota gráfico de perda de pacotes
-    def plotLossGraph(self, path, id, lossStats, title=None, xLabel=None, yLabel=None):
-        
+    def plotLossGraph(self, path, id, lossStats, title=None, xLabel=None, yLabel=None):       
         lossGraph = GraphPlotter(title=title, xLabel=xLabel, yLabel=yLabel, legendPosition="right")
         lossGraph.plotBarGraph(["sent", "received", "lost"], lossStats, ["gray", "green", "red"], ["Sent Packets", "Received Packets", "Lost Packets"])
         lossGraph.saveGraph(path+id+"-loss.png")
 
     # plota gráfico de porcentagem de perda de pacotes
-    def plotLossRateGraph(self, path, id, lossRate):
-        
+    def plotLossRateGraph(self, path, id, lossRate):       
         lossRateGraph = GraphPlotter()
         lossRateGraph.plotPizzaGraph(["received packets", "lost packets"], [100-lossRate, lossRate], ["green", "red"])
         lossRateGraph.saveGraph(path+id+"-loss-rate.png")

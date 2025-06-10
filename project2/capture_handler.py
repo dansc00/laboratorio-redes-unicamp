@@ -1,12 +1,4 @@
-import sys
-import os
-
-# configura raiz para importação 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if ROOT_DIR not in sys.path:
-    sys.path.append(ROOT_DIR)
-
-from analyzer.icmp_analyzer.icmp_analyzer import IcmpAnalyzer
+from analyzer.icmp_analyzer import IcmpAnalyzer
 
 # imprime métricas e salva gráficos de todas capturas da lista
 def makeAllOutput(captures):
@@ -36,8 +28,8 @@ if __name__ == "__main__":
 
     path1 = "capture/h1-h3.pcap"
     path2 = "capture/h2-h4.pcap"
-    capture1 = IcmpAnalyzer("h1-h3", 10, path1)
-    capture2 = IcmpAnalyzer("h2-h4", 10, path2)
+    capture1 = IcmpAnalyzer(id="h1-h3", packetsMargin=10, path=path1)
+    capture2 = IcmpAnalyzer(id="h2-h4", packetsMargin=10, path=path2)
 
     captures = [capture1,
                 capture2]

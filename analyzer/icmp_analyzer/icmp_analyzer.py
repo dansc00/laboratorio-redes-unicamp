@@ -1,37 +1,43 @@
-from scapy.all import *
+from scapy.all import ICMP
 import numpy as np
-from analyzer.packet_analyzer.packet_analyzer import PacketAnalyzer
-from analyzer.ip_analyzer.ip_analyzer import IpAnalyzer
+from analyzer.packet_analyzer import PacketAnalyzer
+from analyzer.ip_analyzer import IpAnalyzer
 
 # analisador de camada ICMP
 class IcmpAnalyzer(PacketAnalyzer):
 
     def __init__(self, id=None, packetsMargin=None, path=None):
         super().__init__(id, packetsMargin, path)
-    
-    # retorna número de sequência de pacote ICMP
-    def getIcmpSeq(self, pkt):
 
-        if ICMP in pkt:
-            return pkt[ICMP].seq
-        
-        else:
-            print("The packet doesn't have an ICMP layer")
-            return 0
-    
     # retorna tipo de ICMP: 0 = echo request , 8 = echo reply
     def getIcmpType(self, pkt):
-        
         if ICMP in pkt:
             return pkt[ICMP].type
         
         else:
             print("The packet doesn't have an ICMP layer")
-            return 0
+            return None
 
+    # retorn id ICMP
+    def getIcmpId(self, pkt):
+        if ICMP in pkt:
+            return pkt[ICMP].id
+        
+        else:
+            print("The packet doesn't have an ICMP layer")
+            return None
+        
+    # retorna número de sequência de pacote ICMP
+    def getIcmpSeq(self, pkt):
+        if ICMP in pkt:
+            return pkt[ICMP].seq
+        
+        else:
+            print("The packet doesn't have an ICMP layer")
+            return None
+    
     # retorna lista de sequência de pacotes ICMP em ordem crescente (sem duplicatas)
     def getIcmpSeqsList(self):
-
         seqsList = set() # conjunto sem duplicatas
         for pkt in self.getPackets():
             if ICMP in pkt:
@@ -39,22 +45,31 @@ class IcmpAnalyzer(PacketAnalyzer):
 
         return sorted(list(seqsList)) if seqsList else []
     
-    # retorna lista de tuplas (ip origem, ip destino, icmp id, icmp seq) para cada pacote ICMP  
+    # retorna pares tuplas com atributos ICMP e IP e pacote equivalente para cada pacote ICMP
     def getIcmpKeys(self):
-
-        icmpKeys = set()
+        icmpKeys = {}
 
         for pkt in self.getPackets():
             if ICMP in pkt:
-                key = (IpAnalyzer.getSrcIp(pkt), IpAnalyzer.getDstIp(pkt), pkt[ICMP].id, pkt[ICMP].seq)
-                icmpKeys.add(key)
+                key = (
+                    IpAnalyzer.getSrcIp(pkt),
+                    IpAnalyzer.getDstIp(pkt), 
+                    self.getIcmpType(pkt), 
+                    self.getIcmpId(pkt), 
+                    self.getIcmpSeq(pkt)
+                )
+                icmpKeys[key] = pkt
         
-        return list(icmpKeys) if icmpKeys else []
+        return icmpKeys
+    
+    # retorna pacote filtrado por chave
+    #override
+    def getPacketByKey(self, key):
+        return self.getIcmpKeys().get(key)
 
     # retorna estatísticas de rtt ICMP: lista de rtt, desvio padrão, média, máximo, mínimo, erro padrão e coeficiente de variação
     # override
     def getRttStats(self):
-
         rtts = []
         requests = {}
 
@@ -81,14 +96,13 @@ class IcmpAnalyzer(PacketAnalyzer):
                 "std": std,
                 "max": max,
                 "min": min,
-                "error": error,
+                "error": error,        
                 "cv": cv
                 }
     
     # retorna estatísticas de intervalo de chegada entre requisições ICMP: lista de intervalos, média, desvio padrão, máximo, mínimo, erro padrão e coeficiente de variação
     # override
     def getIntervalStats(self):
-
         if self.getTotalPackets() < 2:
             print("There is no way to measure interval with less than two packets")
             return None
@@ -120,7 +134,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     # retorna estatísticas de perda de pacotes: enviados, recebidos, perdidos, taxa de perdas
     # override
     def getLossStats(self):
-
         sent = 0
         seqReceived = set()
 
@@ -147,23 +160,21 @@ class IcmpAnalyzer(PacketAnalyzer):
     # imprime métricas ICMP
     # override
     def printGeneralMetrics(self):
-
         id = self.getId()
-        keys = self.getIcmpKeys()
+        icmpKeys = self.getIcmpKeys()
         totalPackets = self.getTotalPackets()
         totalBytes = self.getTotalBytes()
         layers = self.getLayers().get("layers")
         throughput = self.getThroughput()
 
         print("ICMP keys:")
-        for key in keys:
+        for key in icmpKeys.keys():
             print(key)
 
         return super().printGeneralMetrics(id, totalPackets, totalBytes, layers, throughput)
 
     # override
     def printRttMetrics(self):
-
         layer = "ICMP"
         mean = self.getRttStats().get("mean")
         std = self.getRttStats().get("std")
@@ -176,7 +187,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def printIntervalMetrics(self):
-
         layer = "ICMP"
         mean = self.getIntervalStats().get("mean")
         std = self.getIntervalStats().get("std")
@@ -189,7 +199,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def printRttJitterMetrics(self):
-
         layer = "ICMP"
         rtts = self.getRttStats().get("rtts")
         mean = self.getJitterStats(rtts).get("mean")
@@ -203,7 +212,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def printIntervalJitterMetrics(self):
-
         layer = "ICMP"
         intervals = self.getIntervalStats().get("intervals")
         mean = self.getJitterStats(intervals).get("mean")
@@ -217,7 +225,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def printLossMetrics(self):
-
         layer = "ICMP"
         sent = self.getLossStats().get("sent")
         received = self.getLossStats().get("received")
@@ -229,7 +236,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     # plotagem de gráficos ICMP
     # override
     def plotLayersGraph(self, path):
-
         id = self.getId()
         layers = self.getLayers().get("layers")
         nLayers = self.getLayers().get("nLayers")
@@ -241,7 +247,6 @@ class IcmpAnalyzer(PacketAnalyzer):
 
     # override
     def plotRttGraph(self, path):
-
         id = self.getId()
         xAxis = self.getIcmpSeqsList()
         rtts = self.getRttStats().get("rtts")
@@ -253,7 +258,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def plotIntervalGraph(self, path):
-
         id = self.getId()
         xAxis = self.getIcmpSeqsList()
         intervals = self.getIntervalStats().get("intervals")
@@ -265,7 +269,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def plotRttJitterGraph(self, path):
-
         id = self.getId()
         rtts = self.getRttStats().get("rtts")
         xAxis = self.getIcmpSeqsList()
@@ -278,7 +281,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def plotIntervalJitterGraph(self, path):
-
         id = self.getId()
         intervals = self.getIntervalStats().get("intervals")
         xAxis = self.getIcmpSeqsList()
@@ -291,7 +293,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def plotRttHistogram(self, path):
-
         id = self.getId()
         rtts = self.getRttStats().get("rtts")
         title = None
@@ -302,7 +303,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def plotIntervalHistogram(self, path):
-
         id = self.getId()
         intervals = self.getIntervalStats().get("intervals")
         title = None
@@ -313,7 +313,6 @@ class IcmpAnalyzer(PacketAnalyzer):
 
     # override
     def plotRttJitterHistogram(self, path):
-
         id = self.getId()
         rtts = self.getRttStats().get("rtts")
         jitters = self.getJitterStats(rtts).get("jitters")
@@ -325,7 +324,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     # override
     def plotIntervalJitterHistogram(self, path):
-
         id = self.getId()
         intervals = self.getIntervalStats().get("intervals")
         jitters = self.getJitterStats(intervals).get("jitters")
@@ -337,7 +335,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     #override
     def plotLossGraph(self, path):
-
         id = self.getId()
         lossStats = self.getLossStats().get("lossStats")
         title = None
@@ -348,7 +345,6 @@ class IcmpAnalyzer(PacketAnalyzer):
     
     #override
     def plotLossRateGraph(self, path):
-
         id = self.getId()
         lossRate = self.getLossStats().get("lossRate")
 

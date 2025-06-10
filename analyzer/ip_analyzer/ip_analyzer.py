@@ -1,6 +1,6 @@
-from scapy.all import *
+from scapy.all import IP
 import numpy as np
-from analyzer.packet_analyzer.packet_analyzer import PacketAnalyzer
+from analyzer.packet_analyzer import PacketAnalyzer
 
 # analisador de camada IPv4
 class IpAnalyzer(PacketAnalyzer):
@@ -11,21 +11,19 @@ class IpAnalyzer(PacketAnalyzer):
     # retorna IPv4 de origem
     @staticmethod
     def getSrcIp(pkt):
-        
         if IP in pkt:
             return pkt[IP].src
         
         else:
             print("The packet doesn't have an IP layer")
-            return 0
+            return None
 
     # retorna IPv4 de destino
     @staticmethod
     def getDstIp(pkt):
-        
         if IP in pkt:
             return pkt[IP].dst
         
         else:
             print("The packet doesn't have an IP layer")
-            return 0
+            return None

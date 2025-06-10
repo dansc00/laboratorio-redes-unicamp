@@ -1,22 +1,45 @@
-from scapy.all import *
+from scapy.all import TCP
 import numpy as np
-from analyzer.packet_analyzer.packet_analyzer import PacketAnalyzer
-from analyzer.ip_analyzer.ip_analyzer import IpAnalyzer
+from analyzer.packet_analyzer import PacketAnalyzer
+from analyzer.ip_analyzer import IpAnalyzer
 
 # analisador de camada TCP
 class TcpAnalyzer(PacketAnalyzer):
 
     def __init__(self, id=None, packetsMargin=None, path=None):
         super().__init__(id, packetsMargin, path)
+
+    # retorna TCP source port
+    def getTcpSport(self, pkt):
+        if TCP in pkt:
+            return pkt[TCP].sport
+        else:
+            print("The packet doesn't have a TCP layer")
+            return None
+
+    # retorna TCP destination port
+    def getTcpDport(self, pkt):
+        if TCP in pkt:
+            return pkt[TCP].dport
+        else:
+            print("The packet doesn't have a TCP layer")
+            return None
     
     # retorna número de sequência de pacote TCP
     def getTcpSeq(self, pkt):
-
         if TCP in pkt:
             return pkt[TCP].seq
         else:
             print("The packet doesn't have a TCP layer")
             return 0
+    
+    # retorna número de TCP ACK
+    def getTcpAck(self, pkt):
+        if TCP in pkt:
+            return pkt[TCP].ack
+        else:
+            print("The packet doesn't have a TCP layer")
+            return None
     
     # retorna flags do TCP
     # SYN(S): pacote de inicialização de conexão (handshake)
@@ -26,7 +49,6 @@ class TcpAnalyzer(PacketAnalyzer):
     # PSH(P): solicita que os dados sejam enviados imediatamente
     # URG(U): indica que o pacote contém dados urgentes
     def getTcpFlags(self, pkt):
-
         if TCP in pkt:
             return pkt[TCP].flags
         else:
@@ -35,7 +57,6 @@ class TcpAnalyzer(PacketAnalyzer):
 
     # retorna lista de números de sequência TCP em ordem crescente (sem duplicatas)
     def getTcpSeqsList(self):
-
         seqsSet = set()
         for pkt in self.getPackets():
             if TCP in pkt:
@@ -43,28 +64,32 @@ class TcpAnalyzer(PacketAnalyzer):
 
         return sorted(list(seqsSet)) if seqsSet else []
 
-    # retorna lista de tuplas (ip origem, ip destino, porta origem, porta destino, tcp seq) para cada pacote TCP
+    # retorna pares tuplas com atributos TCP e IP e pacote equivalente para cada pacote TCP
     def getTcpKeys(self):
-
-        tcpKeys = set()
+        tcpKeys = {}
         for pkt in self.getPackets():
             if TCP in pkt:
                 key = (
                     IpAnalyzer.getSrcIp(pkt),
                     IpAnalyzer.getDstIp(pkt),
-                    pkt[TCP].sport,
-                    pkt[TCP].dport,
-                    pkt[TCP].seq
+                    self.getTcpSport(pkt),
+                    self.getTcpDport(pkt),
+                    self.getTcpSeq(pkt)
                 )
-                tcpKeys.add(key)
+                tcpKeys[key] = pkt
 
-        return list(tcpKeys) if tcpKeys else []
+        return tcpKeys
+    
+    # retorna pacote filtrado por chave
+    # override
+    def getPacketByKey(self, key):
+        return self.getTcpKeys().get(key)
     
     # retorna estatísticas de RTT baseado no handshake SYN ↔ SYN+ACK
     # override
     def getRttStats(self):
         # dicionário para armazenar timestamp de SYNs:
-        syn_times = {}
+        synTimes = {}
         rtts = []
 
         for pkt in self.getPackets():
@@ -72,29 +97,25 @@ class TcpAnalyzer(PacketAnalyzer):
                 flags = self.getTcpFlags(pkt)
                 src = IpAnalyzer.getSrcIp(pkt)
                 dst = IpAnalyzer.getDstIp(pkt)
-                sport = pkt[TCP].sport
-                dport = pkt[TCP].dport
+                sport = self.getTcpSport(pkt)
+                dport = self.getTcpDport(pkt)
                 seq = self.getTcpSeq(pkt)
 
                 # SYN sem ACK
                 if flags == "S":
                     key = (src, dst, sport, dport, seq)
-                    syn_times[key] = self.getTime(pkt)
+                    synTimes[key] = self.getTime(pkt)
 
                 # SYN+ACK
                 elif flags == "SA":
-                    # ack_num = número de sequência original + 1, então seq_request = ack - 1
-                    ack_num = pkt[TCP].ack - 1
+                    # ackNum = número de sequência original + 1, então seqRequest = ack - 1
+                    ackNum = self.getTcpAck(pkt) - 1
                     # chave reversa do SYN original
-                    rev_key = (dst, src, dport, sport, ack_num)
-                    if rev_key in syn_times:
-                        # getTimeDiff retorna diferença em ms
-                        rtt = self.getTimeDiff(PacketAnalyzer.getPacketByKey(self, rev_key), pkt)
-                        # se getPacketByKey não existir, calculamos: (pkt.time_ms - syn_times[rev_key])
-                        # mas assumimos que PacketAnalyzer.getPacketByKey busca o pacote correto
+                    revKey = (dst, src, dport, sport, ackNum)
+                    if revKey in synTimes:
+                        rtt = self.getTimeDiff(self.getPacketByKey(revKey), pkt)
                         rtts.append(rtt)
 
-        # agora usando "rtts" diretamente
         mean = np.mean(rtts) if rtts else 0
         std = np.std(rtts) if rtts else 0
         maximum = np.max(rtts) if rtts else 0
